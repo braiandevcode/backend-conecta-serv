@@ -5,7 +5,7 @@ import { AuthGuard } from '@nestjs/passport';
 export class ExperiencesController {
   constructor(private readonly experiencesService: ExperiencesService) {}
 
-  @Get('images/:idTasker')
+  @Get('experiences/:idTasker')
   @UseGuards(AuthGuard('jwt'))
   async findAllById(idTasker: string): Promise<{ mimeType:string, base64:string }[] | []> {
     return await this.experiencesService.findAllById(idTasker);
