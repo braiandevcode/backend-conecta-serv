@@ -8,6 +8,7 @@
   "scripts": {
     "db:backups:dev": "dotenv -e .env.development.local -- bash -c \"mysqldump -h $DB_HOST -u $DB_USERNAME -p $DB_NAME > ./data/db_backup_$(date +%Y%m%d%H%M%S).sql\"",
     "db:backups:start": "bash -c 'mysqldump --login-path=prod_backup $DB_NAME > ./data/db_backup_$(date +%Y%m%d%H%M%S).sql'",
+    "postbuild": "cp -r src/templates dist/templates",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
