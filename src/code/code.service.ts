@@ -63,7 +63,8 @@ export class CodeService {
 
   // METODO PARA CREAR PLANTILLA DE RESEND
   private getMailServiceHtml(code:string):string{
-    const filePath:string = join(__dirname, "../templates/code_verify.html");
+    // const filePath:string = join(__dirname, "../templates/code_verify.html");
+    const filePath = join(process.cwd(), 'dist', 'templates', 'code_verify.html');
     let html:string = readFileSync(filePath, 'utf-8');
     html = html.replace('{{CODE}}', code);
     return html;
