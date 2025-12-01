@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
@@ -22,6 +22,7 @@ import { TDataPayloadUser } from 'src/types/typeDataPayloadProfile';
 
 @Injectable()
 export class UserService {
+  private readonly logger: Logger = new Logger(UserService.name);
   // LO PRIMERO QUE SIEMPRE SE EJECUTARA
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>, // REPOSITORIO DE USUARIOS
@@ -251,10 +252,7 @@ export class UserService {
         fullName: user.fullName,
         roles: user.rolesData.map(r => r.nameRole),
         isTasker,
-
         // SOLO SI ES TASKER, con arrays vacíos si no hay datos
-        profileImageId: user.taskerData?.imageProfile?.idProfile || null,
-        experienceImageIds: user.taskerData?.imageExperience?.map(img => img.idExperience) || [],
         days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
         hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
         services: isTasker
@@ -288,6 +286,8 @@ export class UserService {
         .leftJoinAndSelect('taskerData.hoursData', 'hours')
         .leftJoinAndSelect('taskerData.categoryData', 'category')
         .leftJoinAndSelect('taskerData.budgetData', 'budget')
+        .leftJoinAndSelect('taskerData.imageProfile', 'imageProfile') // <--- AGREGAR
+        .leftJoinAndSelect('taskerData.imageExperience', 'imageExperience') // <--- AGREGAR
         .where('user.idUser != :excludeUserId', { excludeUserId })
         .andWhere('user.active = true')
         .andWhere('role.nameRole = :role', { role: 'tasker' })
@@ -314,9 +314,9 @@ export class UserService {
             worksArea: user.taskerData?.workAreasData?.map(w => w.workAreaName) || [],
             category: user.taskerData?.categoryData?.categoryName || '',
             budget: user.taskerData?.budgetData || null,
-            description: user.taskerData?.description || '',
             profileImageId: user.taskerData?.imageProfile?.idProfile || null,
-            experienceImageIds: user.taskerData?.imageExperience?.map(img => img.idExperience) || [],
+            experienceImageIds:
+              user.taskerData?.imageExperience?.map(img => img.idExperience) || [],
           }) as TDataPayloadUser,
       );
     } catch (error) {
