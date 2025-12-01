@@ -90,14 +90,6 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  // BUSCAR USUARIO POR ID (SIN IMPLEMENTAR)
-  @Get('/users/:id')
-  @UseGuards(AuthGuard('jwt'))
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
-  }
-
-
   // EDITAR DATOS DE UN USUARIO (SIN IMPLEMENTAR)
   @Patch('/users/:id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {

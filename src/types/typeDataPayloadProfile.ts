@@ -5,7 +5,6 @@ type TBudgetData = {
 };
 
 export type TDataPayloadUser = {
-  // DATOS BASICO SOLO SI ELIGIO CLIENTE
   sub: string;
   userName: string;
   fullName: string;
@@ -19,7 +18,9 @@ export type TDataPayloadUser = {
   worksArea: string[] | null;
   category: string | null;
   budget?: TBudgetData | null;
-  profileImage: string | null;
   description: string | null;
-  experienceImages: string[] | null;
+
+  // IDs  DE IMAGENES
+  profileImageId: string | null;
+  experienceImageIds: string[] | null;
 };

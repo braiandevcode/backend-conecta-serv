@@ -244,18 +244,6 @@ export class UserService {
 
       const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
 
-      let profileImage: string | null = null;
-      if (isTasker && user.taskerData?.imageProfile) {
-        profileImage = `data:${user.taskerData.imageProfile.mimeType};base64,${user.taskerData.imageProfile.imageBase64.toString('base64')}`;
-      }
-
-      let experienceImages: string[] = [];
-      if (isTasker && user.taskerData?.imageExperience?.length) {
-        experienceImages = user.taskerData.imageExperience.map(
-          img => `data:${img.mimeType};base64,${img.imageBase64.toString('base64')}`,
-        );
-      }
-
       return {
         sub: user.idUser,
         userName: user.userName,
@@ -265,7 +253,8 @@ export class UserService {
         isTasker,
 
         // SOLO SI ES TASKER, con arrays vacíos si no hay datos
-        profileImage,
+        profileImageId: user.taskerData?.imageProfile?.idProfile || null,
+        experienceImageIds: user.taskerData?.imageExperience?.map(img => img.idExperience) || [],
         days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
         hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
         services: isTasker
@@ -277,7 +266,6 @@ export class UserService {
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
         budget: isTasker ? user.taskerData?.budgetData || null : null,
         description: isTasker ? user.taskerData?.description || '' : '',
-        experienceImages,
       } as TDataPayloadUser;
     } catch (error) {
       const err = error as HttpException;
@@ -300,31 +288,26 @@ export class UserService {
         .leftJoinAndSelect('taskerData.hoursData', 'hours')
         .leftJoinAndSelect('taskerData.categoryData', 'category')
         .leftJoinAndSelect('taskerData.budgetData', 'budget')
-        .leftJoinAndSelect('taskerData.imageProfile', 'imageProfile')
-        .leftJoinAndSelect('taskerData.imageExperience', 'imageExperience')
         .where('user.idUser != :excludeUserId', { excludeUserId })
         .andWhere('user.active = true')
         .andWhere('role.nameRole = :role', { role: 'tasker' })
         .getMany();
-      
-        // SI NO HAY LONGITUD
-        if(taskers.length === 0){
-           console.log('TASKERS: ', taskers);
-          return [] // SOLO ARRAY VACIO
-        }
+
+      // SI NO HAY LONGITUD
+      if (taskers.length === 0) {
+        return []; // SOLO ARRAY VACIO
+      }
 
       // MAPEAR EL FORMATO TDataPayloadUser
       return taskers.map(
-        user =>({
+        user =>
+          ({
             sub: user.idUser,
             userName: user.userName,
             fullName: user.fullName,
             email: user.email,
             roles: user.rolesData.map(r => r.nameRole),
             isTasker: true,
-            profileImage: user.taskerData?.imageProfile
-              ? `data:${user.taskerData.imageProfile.mimeType};base64,${user.taskerData.imageProfile.imageBase64.toString('base64')}`
-              : null,
             days: user.taskerData?.daysData?.map(d => d.dayName) || [],
             hours: user.taskerData?.hoursData?.map(h => h.hourName) || [],
             services: user.taskerData?.servicesData?.map(s => s.serviceName) || [],
@@ -332,11 +315,12 @@ export class UserService {
             category: user.taskerData?.categoryData?.categoryName || '',
             budget: user.taskerData?.budgetData || null,
             description: user.taskerData?.description || '',
-            experienceImages: user.taskerData?.imageExperience?.map(img => `data:${img.mimeType};base64,${img.imageBase64.toString('base64')}`) || [],
+            profileImageId: user.taskerData?.imageProfile?.idProfile || null,
+            experienceImageIds: user.taskerData?.imageExperience?.map(img => img.idExperience) || [],
           }) as TDataPayloadUser,
       );
     } catch (error) {
-     const err = error as HttpException;
+      const err = error as HttpException;
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }

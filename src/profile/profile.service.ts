@@ -1,5 +1,4 @@
 import { HttpException, Injectable } from '@nestjs/common';
-// import { UpdateProfileDto } from './dto/update-profile.dto';
 import { EntityManager, Repository } from 'typeorm';
 import { Profile } from './entities/profile.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -48,17 +47,29 @@ export class ProfileService {
     }
   }
 
+  // BUSCAR IMAGEN POR ID
+  async findOne(idTasker: string): Promise<{ mimeType: string; base64: string } | null> {
+    try {
+      const imageProfile: Profile | null = await this.imageProfileRepo.findOne({
+        where: { tasker: { idTasker } },
+      });
+
+      if (!imageProfile) return null;
+
+      return {
+        mimeType: imageProfile.mimeType,
+        base64: imageProfile.imageBase64.toString('base64'),
+      };
+    } catch (error) {
+      const err = error as HttpException;
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
+  }
+
   findAll() {
     return `This action returns all profile`;
   }
-
-  findOne(id: number) {
-    return `This action returns a #${id} profile`;
-  }
-
-  // update(id: number, updateProfileDto: UpdateProfileDto) {
-  //   return `This action updates a #${id} profile`;
-  // }
 
   remove(id: number) {
     return `This action removes a #${id} profile`;

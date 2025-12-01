@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 // import { UpdateExperienceDto } from './dto/update-experience.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Experience } from './entities/experience.entity';
 import { EntityManager, Repository } from 'typeorm';
 import path from 'path';
 import { randomUUID } from 'crypto';
+import { ErrorManager } from 'src/config/ErrorMannager';
+import { TDataPayloadUser } from 'src/types/typeDataPayloadProfile';
 
 @Injectable()
 export class ExperiencesService {
@@ -13,12 +15,15 @@ export class ExperiencesService {
     private readonly imageExperienceRepo: Repository<Experience>,
   ) {}
 
+  // CREAR IMAGENES
   async create(
     files: Express.Multer.File[],
     idTasker: string,
     manager?: EntityManager,
   ): Promise<Experience[]> {
-    const repo: Repository<Experience> = manager ? manager.getRepository(Experience) : this.imageExperienceRepo;
+    const repo: Repository<Experience> = manager
+      ? manager.getRepository(Experience)
+      : this.imageExperienceRepo;
 
     // OBTENER TODOS LOS ORDERS EXISTENTES
     const existingImages = await repo.find({
@@ -28,7 +33,7 @@ export class ExperiencesService {
 
     // DETERMINAR EL ORDEN MAS ALTO
     // CREA ARRAY DE TODOS LOS NUMEROS DE ORDER [1, 2, 3, 1]
-    const orders: number[] = existingImages.map((img) => img.order);
+    const orders: number[] = existingImages.map(img => img.order);
 
     // CALCULAMOS EL ORDEN MAS ALTO
     const maxOrder = orders.length > 0 ? Math.max(...orders) : 0;
@@ -62,5 +67,27 @@ export class ExperiencesService {
     }
 
     return savedExperiences; // ==> RETORNAR
+  }
+
+  // BUSCAR IMAGENES POR ID
+  async findAllById(idTasker: string): Promise<{ mimeType:string, base64:string }[] | []> {
+    try {
+      const imagesExp: Experience[] = await this.imageExperienceRepo.find({
+        where: { tasker: { idTasker } },
+      });
+
+      // SI NO HAY LONGITUD
+      if (imagesExp.length === 0) return [];
+
+      // SINO MAPEAR
+      return imagesExp.map(img => ({
+        mimeType: img.mimeType,
+        base64: img.imageBase64.toString('base64'),
+      }));
+    } catch (error) {
+      const err = error as HttpException;
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
   }
 }

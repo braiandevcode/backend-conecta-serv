@@ -1,7 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ExperiencesService } from './experiences.service';
-
-@Controller('experiences')
+import { AuthGuard } from '@nestjs/passport';
+@Controller('api/v1')
 export class ExperiencesController {
   constructor(private readonly experiencesService: ExperiencesService) {}
+
+  @Get('images/:idTasker')
+  @UseGuards(AuthGuard('jwt'))
+  async findAllById(idTasker: string): Promise<{ mimeType:string, base64:string }[] | []> {
+    return await this.experiencesService.findAllById(idTasker);
+  }
 }
