@@ -7,7 +7,7 @@
     "assets": [
       {
         "include": "templates/**/*",
-        "outDir": "dist/templates"
+        "outDir": "."
       }
     ],
     "watchAssets": true

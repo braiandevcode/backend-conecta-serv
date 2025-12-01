@@ -68,7 +68,7 @@ import { ScheduleModule } from '@nestjs/schedule';
       }),
     }),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'assets')
+      rootPath: join(process.cwd(), 'dist', 'assets')
     }),
     //CROS INICIALIZA EL PLANIFICADOR. 
     // REGISTRA CUALQUIER CRON JOB TIMEOUT O INTERVALO QUE EXISTA DENTRO DE LA APP.
