@@ -276,6 +276,7 @@ export class UserService {
   async getActiveUsers(excludeUserId: string): Promise<TDataPayloadUser[]> {
     try {
       // USO DE QUERY BUILDER PARA CONSULTAS N:N O N:1 QUE SON COMPLEJAS EN BUSQUEDAS
+      // LEER TASKERS ACTIVOS - VERSIÓN CORREGIDA Y OPTIMIZADA
       const taskers: User[] = await this.userRepository
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.rolesData', 'role')
@@ -286,8 +287,23 @@ export class UserService {
         .leftJoinAndSelect('taskerData.hoursData', 'hours')
         .leftJoinAndSelect('taskerData.categoryData', 'category')
         .leftJoinAndSelect('taskerData.budgetData', 'budget')
-        .leftJoinAndSelect('taskerData.imageProfile', 'imageProfile') // <--- AGREGAR
-        .leftJoinAndSelect('taskerData.imageExperience', 'imageExperience') // <--- AGREGAR
+
+        .leftJoin('taskerData.imageProfile', 'imageProfile')
+        .leftJoin('taskerData.imageExperience', 'imageExperience')
+        .select([
+          'user', 
+          'role.nameRole',
+          'taskerData',
+          'services',
+          'worksArea',
+          'days',
+          'hours',
+          'category',
+          'budget',
+          'imageProfile.idProfile', 
+          'imageExperience.idExperience', 
+        ])
+
         .where('user.idUser != :excludeUserId', { excludeUserId })
         .andWhere('user.active = true')
         .andWhere('role.nameRole = :role', { role: 'tasker' })
