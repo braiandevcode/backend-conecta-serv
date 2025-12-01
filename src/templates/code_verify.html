@@ -35,14 +35,19 @@
         background-color: #d9dbd9;
         padding: 20px;
         text-align: center;
+        position: relative;
       }
 
       .email__logo {
         max-width: 120px;
-        height: 50px;
+        height: auto; 
         display: block;
-        object-fit: contain;
         margin: 0 auto;
+        background-color: #ffffff; 
+        border-radius: 50%;
+        padding: 10px; 
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        object-fit: contain;
       }
 
       /* ===== BODY ===== */
@@ -108,8 +113,7 @@
                 <img
                   src="https://backend-conecta-serv-production.up.railway.app/assets/CS.png"
                   alt="Logo"
-                  class="email__logo"
-                />
+                  class="email__logo" />
               </td>
             </tr>
 
@@ -117,13 +121,11 @@
             <tr>
               <td class="email__body">
                 <h2 class="email__title">Código de Verificación</h2>
-                <p class="email__text">
-                  Tu código de verificación para completar el registro es:
-                </p>
+                <p class="email__text">Tu código de verificación para completar el registro es:</p>
                 <p class="email__code">{{CODE}}</p>
                 <p class="email__text email__text--small">
-                  Este código es válido por <strong>5 minutos</strong>. No
-                  compartas este código con nadie.
+                  Este código es válido por <strong>5 minutos</strong>. No compartas este código con
+                  nadie.
                 </p>
               </td>
             </tr>
@@ -135,17 +137,12 @@
 
                 <p class="email__footer-text">
                   Soporte:
-                  <a
-                    href="mailto:conectaservconecta@gmail.com"
-                    class="email__footer-link"
-                  >
+                  <a href="mailto:conectaservconecta@gmail.com" class="email__footer-link">
                     conectaservconecta@gmail.com
                   </a>
                 </p>
 
-                <p class="email__footer-text">
-                  © 2025 ConectaServ. Todos los derechos reservados.
-                </p>
+                <p class="email__footer-text">© 2025 ConectaServ. Todos los derechos reservados.</p>
               </td>
             </tr>
           </table>
