@@ -48,7 +48,6 @@ import { ScheduleModule } from '@nestjs/schedule';
         RESEND_API_KEY:Joi.string().required(),
         // DOMINIO + PUERTO
         FE_HOST:Joi.string().required(),
-        FE_PORT:Joi.number().required(),
       }),
     }),
     // CONECTAR BASE DE DATOS
