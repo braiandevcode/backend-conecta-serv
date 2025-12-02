@@ -14,8 +14,12 @@ export type TActiveTaskerUser = {
     idCategory: string | null;
   };
 
+  days: string[];
+  hours: string[];
+  services: string[];
+  worksArea: string[];
+  category: string;
+
   profileImageUrl: string;
   experienceImagesUrl: string[];
 };
-
-
