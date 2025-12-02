@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { DataSource, Not, Repository } from 'typeorm';
+import { DataSource, IsNull, Not, Repository } from 'typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
 import { Role } from 'src/role/entities/role.entity';
 import { Location } from 'src/location/entities/location.entity';
@@ -18,7 +18,8 @@ import { UserIdentifyEmailDto } from './dto/user-identify-email-dto';
 import { iMessageResponseStatus } from 'src/code/interface/iMessagesResponseStatus';
 import { ESeparatorsMsgErrors } from 'src/common/enums/enumSeparatorMsgErrors';
 import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
-import { TDataPayloadUser } from 'src/types/typeDataPayloadProfile';
+import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
+import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
 
 @Injectable()
 export class UserService {
@@ -192,7 +193,7 @@ export class UserService {
     }
   }
 
-  // BUSCAR SOLO EL USUARIO EN LA TABLA USERS DE USUARIOS ACTIVOS
+  // BUSCAR SOLO EL USUARIO EN LA TABLA DE USUARIOS ACTIVOS
   async findByUserNameActiveForAuth({ userName }: { userName: string }): Promise<User | null> {
     try {
       // CONSULTA
@@ -222,7 +223,7 @@ export class UserService {
   //LEER DATOS DEL USUARIO PARA CARGAR DATOS LUEGO DEL LOGIN
   async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
     try {
-      const userId = payload.sub;
+      const userId:string = payload.sub;
 
       const user: User | null = await this.userRepository.findOne({
         where: { idUser: userId, active: true },
@@ -236,35 +237,39 @@ export class UserService {
           'taskerData.hoursData',
           'taskerData.categoryData',
           'taskerData.budgetData',
-          'taskerData.imageProfile',
-          'taskerData.imageExperience',
+          'taskerData.imageExperience'
         ],
       });
 
       if (!user) return null;
 
-      const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
+      const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');    
 
+      // RETORNAR
       return {
         sub: user.idUser,
         userName: user.userName,
         email: user.email,
         fullName: user.fullName,
-        roles: user.rolesData.map(r => r.nameRole),
-        isTasker,
+        roles: user.rolesData?.map(r => ({
+          idRole: r.idRole,
+          nameRole: r.nameRole,
+        })),
+
+        isTasker, //SI ES TASKER
         // SOLO SI ES TASKER, con arrays vacíos si no hay datos
         days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
         hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
-        services: isTasker
-          ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
-          : [],
-        worksArea: isTasker
-          ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
-          : [],
+        services: isTasker ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || [] : [],
+        worksArea: isTasker ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [] : [],
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
         budget: isTasker ? user.taskerData?.budgetData || null : null,
         description: isTasker ? user.taskerData?.description || '' : '',
-      } as TDataPayloadUser;
+        profileImageUrl: isTasker ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image` : null,
+        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`) 
+      : [],
+      }
+
     } catch (error) {
       const err = error as HttpException;
       if (err instanceof ErrorManager) throw err;
@@ -272,74 +277,37 @@ export class UserService {
     }
   }
 
-  // LEER TASKERS ACTIVOS
-  async getActiveUsers(excludeUserId: string): Promise<TDataPayloadUser[]> {
-    try {
-      // USO DE QUERY BUILDER PARA CONSULTAS N:N O N:1 QUE SON COMPLEJAS EN BUSQUEDAS
-      // LEER TASKERS ACTIVOS - VERSIÓN CORREGIDA Y OPTIMIZADA
-      const taskers: User[] = await this.userRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.rolesData', 'role')
-        .leftJoinAndSelect('user.taskerData', 'taskerData')
-        .leftJoinAndSelect('taskerData.servicesData', 'services')
-        .leftJoinAndSelect('taskerData.workAreasData', 'worksArea')
-        .leftJoinAndSelect('taskerData.daysData', 'days')
-        .leftJoinAndSelect('taskerData.hoursData', 'hours')
-        .leftJoinAndSelect('taskerData.categoryData', 'category')
-        .leftJoinAndSelect('taskerData.budgetData', 'budget')
+  // LEER USUARIOS TASKERS ACTIVOS
+  async getActiveUsersTasker(sub: string): Promise<TActiveTaskerUser[]> {
+    const users = await this.userRepository.find({
+      where: {
+        idUser: Not(sub),
+        active: true,
+        taskerData: Not(IsNull()),
+      },
+      relations: ['rolesData', 'taskerData', 'taskerData.imageExperience'],
+    });
 
-        .leftJoin('taskerData.imageProfile', 'imageProfile')
-        .leftJoin('taskerData.imageExperience', 'imageExperience')
-        .select([
-          'user', 
-          'role.nameRole',
-          'taskerData',
-          'services',
-          'worksArea',
-          'days',
-          'hours',
-          'category',
-          'budget',
-          'imageProfile.idProfile', 
-          'imageExperience.idExperience', 
-        ])
+    return users.map(u => ({
+      idUser: u.idUser,
+      fullName: u.fullName,
+      userName: u.userName,
 
-        .where('user.idUser != :excludeUserId', { excludeUserId })
-        .andWhere('user.active = true')
-        .andWhere('role.nameRole = :role', { role: 'tasker' })
-        .getMany();
+      roles: u.rolesData?.map(r => ({
+        idRole: r.idRole,
+        nameRole: r.nameRole,
+      })),
 
-      // SI NO HAY LONGITUD
-      if (taskers.length === 0) {
-        return []; // SOLO ARRAY VACIO
-      }
+      tasker: {
+        idTasker: u.taskerData?.idTasker,
+        description: u.taskerData?.description,
+        idCategory: u.taskerData?.idCategory,
+      },
 
-      // MAPEAR EL FORMATO TDataPayloadUser
-      return taskers.map(
-        user =>
-          ({
-            sub: user.idUser,
-            userName: user.userName,
-            fullName: user.fullName,
-            email: user.email,
-            roles: user.rolesData.map(r => r.nameRole),
-            isTasker: true,
-            days: user.taskerData?.daysData?.map(d => d.dayName) || [],
-            hours: user.taskerData?.hoursData?.map(h => h.hourName) || [],
-            services: user.taskerData?.servicesData?.map(s => s.serviceName) || [],
-            worksArea: user.taskerData?.workAreasData?.map(w => w.workAreaName) || [],
-            category: user.taskerData?.categoryData?.categoryName || '',
-            budget: user.taskerData?.budgetData || null,
-            profileImageId: user.taskerData?.imageProfile?.idProfile || null,
-            experienceImageIds:
-              user.taskerData?.imageExperience?.map(img => img.idExperience) || [],
-          }) as TDataPayloadUser,
-      );
-    } catch (error) {
-      const err = error as HttpException;
-      if (err instanceof ErrorManager) throw err;
-      throw ErrorManager.createSignatureError(err.message);
-    }
+      profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
+      experienceImagesUrl: u.taskerData?.imageExperience ? u.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`) 
+      : [],
+    })) as TActiveTaskerUser[];
   }
 
   async findOne(id: number) {

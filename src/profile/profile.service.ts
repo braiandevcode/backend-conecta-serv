@@ -5,10 +5,29 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
 import { randomUUID } from 'crypto';
 import path from 'path'; //MODULO DE NODE
+import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
+import { TTaskerImage } from 'src/types/typeTaskerImage';
 
 @Injectable()
 export class ProfileService {
   constructor(@InjectRepository(Profile) private readonly imageProfileRepo: Repository<Profile>) {}
+
+  // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE PERFIL
+  public mapProfileImage = (profile: Profile | null): ImageMetadataDto | null => {
+    if (!profile) return null;
+    return {
+      idImage: profile.idProfile,
+      systemFileName: profile.systemFileName,
+      mimeType: profile.mimeType,
+      originalName: profile.originalName,
+      size: profile.size,
+      createAt: profile.createdAt,
+      updateAt: profile.updatedAt,
+      deleteAt: profile.deletedAt,
+      idTasker: profile.tasker.idTasker,
+    } as ImageMetadataDto;
+  };
+
   async create(
     file: Express.Multer.File | null,
     idTasker: string,
@@ -67,11 +86,26 @@ export class ProfileService {
     }
   }
 
-  findAll() {
-    return `This action returns all profile`;
-  }
+  // LEER LA IMAGEN DEL PERFIL DEL TASKER
+  async getProfileByTasker(idTasker: string): Promise<TTaskerImage | null> {
+    try {
+      const imageProfile: Profile  | null = await this.imageProfileRepo.findOne({
+        where: { tasker: { idTasker } },
+      });
 
-  remove(id: number) {
-    return `This action removes a #${id} profile`;
+      if(!imageProfile) return null;
+
+       return {
+        base64: imageProfile.imageBase64,
+        id: imageProfile.idProfile,
+        mimeType: imageProfile.mimeType,
+        originalName: imageProfile.originalName,
+        systemFileName: imageProfile.systemFileName,
+      } as TTaskerImage;
+    } catch (error) {
+      const err = error as HttpException;
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
   }
 }

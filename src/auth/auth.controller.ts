@@ -14,7 +14,8 @@ import { configAuthCookie } from './constants/configAuthCookie';
 import { iAccessToken } from './interface/iAccessToken';
 import { RefreshToken } from 'src/refresh-tokens/entities/refresh-token.entity';
 import { User } from 'src/user/entities/user.entity';
-import { TDataPayloadUser } from 'src/types/typeDataPayloadProfile';
+import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
+
 
 // CON passthrough: true, Nest PERMITE USAR res.cookie() PERO SEGUIR DEVOLVIENDO UN RETURN NORMALMENTE
 @Controller('api/v1/auth')

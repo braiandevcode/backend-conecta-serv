@@ -23,7 +23,8 @@ import { UserIdentifyEmailDto } from './dto/user-identify-email-dto';
 import { iMessageResponseStatus } from 'src/code/interface/iMessagesResponseStatus';
 import { AuthGuard } from '@nestjs/passport';
 import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
-import { TDataPayloadUser } from 'src/types/typeDataPayloadProfile';
+import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
+import { User } from './entities/user.entity';
 
 @Controller('api/v1')
 export class UserController {
@@ -31,12 +32,15 @@ export class UserController {
 
   @Post('/users')
   // INTERCEPTAR AMBOS CAMPOS
-  @UseInterceptors(FileFieldsInterceptor([
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
         { name: 'imageProfile', maxCount: 1 }, // EL CAMPO DEL PERFIL
         { name: 'imageExperiences', maxCount: 10 }, // CAMPO DE EXPERIENCIAS HASTA 10
       ],
       multerOptions,
-  ))
+    ),
+  )
   create(
     // RECUPERA UN OBJETO CON TODOS LOS CAMPOS SEPARADOS POR NOMBRE.
     @UploadedFiles()
@@ -55,13 +59,13 @@ export class UserController {
     )
     createUserDto: CreateUserDto,
   ) {
-
-    const profileFile: Express.Multer.File | null =
-      files.imageProfile?.[0] || null;
+    const profileFile: Express.Multer.File | null = files.imageProfile?.[0] || null;
     const experienceFiles: Express.Multer.File[] = files.imageExperiences || [];
 
     // EXTRAER Y APLICAR EL PIPE SOLO EN IMAGENES DE EXPERIENCIAS
-    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(experienceFiles);
+    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(
+      experienceFiles,
+    );
     //LLAMAR AL SERVICIO
     return this.userService.create(
       profileFile, //ARCHIVO PERFIL
@@ -69,18 +73,19 @@ export class UserController {
       createUserDto,
     );
   }
-  
-  @Get('users/taskers')
+
+  @Get('users/actives')
   @UseGuards(AuthGuard('jwt'))
-  async getTaskers(@Req() req: Request & { user: iJwtPayload }): Promise<TDataPayloadUser[]> {
-    const userId: string = req.user.sub;
-    console.log(userId);
-    return await this.userService.getActiveUsers(userId);
+  async getActiveUsers(@Req() req: Request & { user: iJwtPayload }): Promise<TActiveTaskerUser[]> {
+    const userId = req.user.sub;
+    return this.userService.getActiveUsersTasker(userId);
   }
 
   // IDENTIFICAR UN USUARIO POR SU EMAIL
   @Post('/users/identify')
-  async getUserEmailActive(@Body() userIdentifyEmailDto: UserIdentifyEmailDto): Promise<iMessageResponseStatus> {
+  async getUserEmailActive(
+    @Body() userIdentifyEmailDto: UserIdentifyEmailDto,
+  ): Promise<iMessageResponseStatus> {
     return await this.userService.getUserEmailActive(userIdentifyEmailDto);
   }
 
@@ -96,7 +101,6 @@ export class UserController {
   findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);
   }
-
 
   // EDITAR DATOS DE UN USUARIO (SIN IMPLEMENTAR)
   @Patch('/users/:id')

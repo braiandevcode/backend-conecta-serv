@@ -23,8 +23,8 @@ import { Profile } from 'src/profile/entities/profile.entity';
 import { Experience } from 'src/experiences/entities/experience.entity';
 import { instanceToPlain } from 'class-transformer';
 import { TaskerResponse } from './dto/response-tasker.dto';
-import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
 import { ECategory } from 'src/common/enums/enumCategory';
+import { TTaskerImage } from 'src/types/typeTaskerImage';
 
 @Injectable()
 export class TaskersService {
@@ -40,40 +40,6 @@ export class TaskersService {
     private readonly imageExpService: ExperiencesService,
   ) {}
 
-  // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE CADA IMAGEN DE EXPERIENCIA
-  private mapExperienceImages = (experiences: Experience[]): ImageMetadataDto[] => {
-    return experiences.map(
-      (exp): ImageMetadataDto => ({
-        idImage: exp.idExperience,
-        systemFileName: exp.systemFileName,
-        mimeType: exp.mimeType,
-        originalName: exp.originalName,
-        size: exp.size,
-        createAt: exp.createdAt,
-        updateAt: exp.updatedAt,
-        deleteAt: exp.deletedAt,
-        order: exp.order,
-        idTasker: exp.tasker.idTasker,
-      }),
-    );
-  };
-
-  // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE PERFIL
-  private mapProfileImage = (profile: Profile | null): ImageMetadataDto | null => {
-    if (!profile) return null;
-
-    return {
-      idImage: profile.idProfile,
-      systemFileName: profile.systemFileName,
-      mimeType: profile.mimeType,
-      originalName: profile.originalName,
-      size: profile.size,
-      createAt: profile.createdAt,
-      updateAt: profile.updatedAt,
-      deleteAt: profile.deletedAt,
-      idTasker: profile.tasker.idTasker,
-    } as ImageMetadataDto;
-  };
 
   // CREAR UN TASKER
   async create(
@@ -152,8 +118,8 @@ export class TaskersService {
 
       return {
         ...taskerPlain,
-        profileImage: this.mapProfileImage(imageProfile),
-        experiencesImages: this.mapExperienceImages(imagesExperiences),
+        profileImage: this.imageProfileService.mapProfileImage(imageProfile),
+        experiencesImages: this.imageExpService.mapExperienceImages(imagesExperiences),
       } as TaskerResponse;
     } catch (error) {
       const err = error as HttpException;
@@ -162,6 +128,21 @@ export class TaskersService {
       // SI NO, CREO UN ERROR 500 GENÉRICO CON FIRMA DE ERROR
       throw ErrorManager.createSignatureError(err.message);
     }
+  }
+
+  // LEER IMAGEN DE TASKER
+  async getProfileImage(idTasker: string): Promise<TTaskerImage | null> {
+    return this.imageProfileService.getProfileByTasker(idTasker);
+  }
+
+  // LEER TODAS SUS IMAGENES DE EXPERIENCIAS
+  async getExperienceImages(idTasker: string): Promise<TTaskerImage[]> {
+    return this.imageExpService.getExperiencesByTasker(idTasker);
+  }
+
+  // DELEGO METODO DE SERVICIO IMAGENES EXPERIENCIAS
+  async getSingleExperienceImage(idExperience: string): Promise<TTaskerImage | null> {
+    return await this.imageExpService.getExperienceImageById(idExperience);
   }
 
   findOne(id: number) {

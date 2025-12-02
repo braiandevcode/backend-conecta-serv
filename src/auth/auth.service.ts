@@ -9,7 +9,7 @@ import argon2 from 'argon2';
 import { User } from 'src/user/entities/user.entity';
 import { ONE_WEEK_IN_MS } from './constants/timeExpiration';
 import { iAccessToken } from './interface/iAccessToken';
-import { TDataPayloadUser } from 'src/types/typeDataPayloadProfile';
+import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
 
 @Injectable()
 export class AuthService {

@@ -19,14 +19,4 @@ export class ProfileController {
   async findOne(@Param('idTasker') idTasker: string): Promise<{ mimeType: string; base64: string } | null> {
     return await this.profileService.findOne(idTasker);
   }
-
-  @Get()
-  findAll() {
-    return this.profileService.findAll();
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.profileService.remove(+id);
-  }
 }
