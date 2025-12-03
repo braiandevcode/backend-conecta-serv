@@ -31,7 +31,7 @@ export class UserService {
     private readonly locationService: LocationsService, //SERVICIO LOCATIONS
     private readonly roleService: RoleService, //SERVICIO ROLES
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   // CREAR DATOS BASICOS DE USUARIO (DEFAULT ROL CLIENTE)
   async create(
@@ -223,7 +223,7 @@ export class UserService {
   //LEER DATOS DEL USUARIO PARA CARGAR DATOS LUEGO DEL LOGIN
   async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
     try {
-      const userId:string = payload.sub;
+      const userId: string = payload.sub;
 
       const user: User | null = await this.userRepository.findOne({
         where: { idUser: userId, active: true },
@@ -243,7 +243,7 @@ export class UserService {
 
       if (!user) return null;
 
-      const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');    
+      const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
 
       // RETORNAR
       return {
@@ -266,8 +266,8 @@ export class UserService {
         budget: isTasker ? user.taskerData?.budgetData || null : null,
         description: isTasker ? user.taskerData?.description || '' : '',
         profileImageUrl: isTasker ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image` : null,
-        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`) 
-      : [],
+        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
+          : [],
       }
 
     } catch (error) {
@@ -285,7 +285,7 @@ export class UserService {
         active: true,
         taskerData: Not(IsNull()),
       },
-      relations: ['rolesData', 'taskerData', 'taskerData.imageExperience'],
+      relations: ['rolesData', 'taskerData', 'taskerData.imageExperience', 'taskerData.servicesData', 'taskerData.workAreasData', 'taskerData.daysData', 'taskerData.hoursData', 'taskerData.categoryData'],
     });
 
     return users.map(u => ({
@@ -304,9 +304,15 @@ export class UserService {
         idCategory: u.taskerData?.idCategory,
       },
 
+      days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
+      hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
+      services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
+      worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
+      category: u.taskerData?.categoryData?.categoryName || '',
+
       profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
-      experienceImagesUrl: u.taskerData?.imageExperience ? u.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`) 
-      : [],
+      experienceImagesUrl: u.taskerData?.imageExperience ? u.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
+        : [],
     })) as TActiveTaskerUser[];
   }
 
