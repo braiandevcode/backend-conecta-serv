@@ -135,11 +135,6 @@ export class TaskersService {
     return this.imageProfileService.getProfileByTasker(idTasker);
   }
 
-  // LEER TODAS SUS IMAGENES DE EXPERIENCIAS
-  async getExperienceImages(idTasker: string): Promise<TTaskerImage[]> {
-    return this.imageExpService.getExperiencesByTasker(idTasker);
-  }
-
   // DELEGO METODO DE SERVICIO IMAGENES EXPERIENCIAS
   async getSingleExperienceImage(idExperience: string): Promise<TTaskerImage | null> {
     return await this.imageExpService.getExperienceImageById(idExperience);

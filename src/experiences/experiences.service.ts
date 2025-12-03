@@ -107,30 +107,6 @@ export class ExperiencesService {
     }
   }
 
-  // LEER TODAS LAS IMAGENES DE UN TASKER
-  async getExperiencesByTasker(idTasker: string): Promise<TTaskerImage[]> {
-    try {
-      const imagesExp: Experience[] = await this.imageExperienceRepo.find({
-        where: { tasker: { idTasker } },
-      });
-
-      // MAPEAR TODAS LAS QUE TENGA EL TASKER EN PARTICULAR
-      const images: TTaskerImage[] = imagesExp.map(image => ({
-        base64: image.imageBase64,
-        id: image.idExperience,
-        mimeType: image.mimeType,
-        originalName: image.originalName,
-        systemFileName: image.systemFileName,
-      }));
-
-      return images; //RETORNAR
-    } catch (error) {
-      const err = error as HttpException;
-      if (err instanceof ErrorManager) throw err;
-      throw ErrorManager.createSignatureError(err.message);
-    }
-  }
-
   // UNA IMAGEN DE EXPERIENCIA POR ID
   async getExperienceImageById(idExperience: string): Promise<TTaskerImage | null> {
     try {
