@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { CreateTaskerDto } from './dto/create-tasker.dto';
 import { UpdateTaskerDto } from './dto/update-tasker.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +28,7 @@ import { TTaskerImage } from 'src/types/typeTaskerImage';
 
 @Injectable()
 export class TaskersService {
+  private readonly logger: Logger = new Logger(TaskersService.name);
   constructor(
     @InjectRepository(Tasker) private readonly taskerRepo: Repository<Tasker>,
     private readonly categoryService: CategoryService,
@@ -39,7 +40,6 @@ export class TaskersService {
     private readonly imageProfileService: ProfileService,
     private readonly imageExpService: ExperiencesService,
   ) {}
-
 
   // CREAR UN TASKER
   async create(
@@ -54,16 +54,21 @@ export class TaskersService {
       // OBTENER EL ROPISITORIO TRANSACCIONAL ==> NECESARIO PARA EL CREATE
       const taskerRepository: Repository<Tasker> = mannager.getRepository(Tasker);
 
+      this.logger.debug(taskerRepository);
       const categoryEntity: Category = await this.categoryService.findOrCreate(
         categoryData,
         mannager,
       );
+
+      this.logger.debug(categoryEntity);
 
       //------------------------------HABITOS------------------------------//
       const workAreaEntity: WorkArea[] = await this.workAreaService.findeOrCreate(
         workAreaData.workArea,
         mannager,
       );
+
+      this.logger.debug(workAreaData);
 
       //------------------------------SERVICIOS------------------------------//
       const serviceEntity: Service[] = await this.serviceService.findeOrCreate(
@@ -72,12 +77,16 @@ export class TaskersService {
         mannager,
       );
 
+      this.logger.debug(serviceEntity);
+
       //------------------------------DIAS------------------------------//
       const dayEntity: Day[] = await this.dayService.findeOrCreate(dayData.day, mannager);
 
+      this.logger.debug(dayEntity);
       //------------------------------HORARIOS------------------------------//
       const hourEntity: Hour[] = await this.hourService.findeOrCreate(hourData.hour, mannager);
 
+      this.logger.debug(hourEntity);
       // -------------SECCION DE DATOS PRESUPUESTO-------------------//
       let budgetEntity: Budget | null = null;
       // PREGUNTO SI VIENEN DATOS EN DTO ANTES DE PROCESAR A AGREGAR EN PRESUPUESTO
@@ -88,6 +97,8 @@ export class TaskersService {
           mannager,
         );
       }
+
+      this.logger.debug(budgetEntity);
 
       // OBJETO DE DATOS QUE SE AGREGAN AL TASKER
       const newDataTasker: Tasker = taskerRepository.create({
@@ -102,6 +113,8 @@ export class TaskersService {
         idCategory: categoryEntity.idCategory,
       });
 
+      this.logger.debug(newDataTasker);
+
       // ALMACENAR DATOS
       const savedDataTasker: Tasker = await taskerRepository.save(newDataTasker);
 
@@ -110,12 +123,16 @@ export class TaskersService {
         (await this.imageProfileService.create(fileProfile, savedDataTasker.idTasker, mannager)) ??
         null;
 
+        this.logger.debug(imageProfile);
+
       // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGENES DEL EXPERIENCIAS
-      const imagesExperiences: Experience[] =
-        (await this.imageExpService.create(filesExp, savedDataTasker.idTasker, mannager)) ?? [];
+      const imagesExperiences: Experience[] =(await this.imageExpService.create(filesExp, savedDataTasker.idTasker, mannager)) ?? [];
+
+      this.logger.debug(imagesExperiences);
 
       const taskerPlain = instanceToPlain(savedDataTasker) as Tasker;
 
+      this.logger.debug(taskerPlain);
       return {
         ...taskerPlain,
         profileImage: this.imageProfileService.mapProfileImage(imageProfile),
@@ -123,6 +140,7 @@ export class TaskersService {
       } as TaskerResponse;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       // SI EL ERROR YA FUE MANEJADO POR ERRORMANAGER, LO RELANZO TAL CUAL
       if (err instanceof ErrorManager) throw err;
       // SI NO, CREO UN ERROR 500 GENÉRICO CON FIRMA DE ERROR

@@ -24,7 +24,6 @@ import { iMessageResponseStatus } from 'src/code/interface/iMessagesResponseStat
 import { AuthGuard } from '@nestjs/passport';
 import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
 import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
-import { User } from './entities/user.entity';
 
 @Controller('api/v1')
 export class UserController {
@@ -63,9 +62,7 @@ export class UserController {
     const experienceFiles: Express.Multer.File[] = files.imageExperiences || [];
 
     // EXTRAER Y APLICAR EL PIPE SOLO EN IMAGENES DE EXPERIENCIAS
-    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(
-      experienceFiles,
-    );
+    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(experienceFiles);
     //LLAMAR AL SERVICIO
     return this.userService.create(
       profileFile, //ARCHIVO PERFIL
@@ -74,6 +71,7 @@ export class UserController {
     );
   }
 
+  // USUARIOS ACTIVOS LOGEADOS
   @Get('users/actives')
   @UseGuards(AuthGuard('jwt'))
   async getActiveUsers(@Req() req: Request & { user: iJwtPayload }): Promise<TActiveTaskerUser[]> {
@@ -100,12 +98,6 @@ export class UserController {
   @UseGuards(AuthGuard('jwt'))
   findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);
-  }
-
-  // EDITAR DATOS DE UN USUARIO (SIN IMPLEMENTAR)
-  @Patch('/users/:id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(+id, updateUserDto);
   }
 
   // ELIMNAR DE FORMA FISICA UN USUARIO SIN IMPLEMENTAR
