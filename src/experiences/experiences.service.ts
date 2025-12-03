@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Experience } from './entities/experience.entity';
 import { EntityManager, Repository } from 'typeorm';
@@ -7,10 +7,14 @@ import { randomUUID } from 'crypto';
 import { ErrorManager } from 'src/config/ErrorMannager';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
 import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
+import { TDataImageBase64 } from 'src/types/typeDataImageBase64';
 
 @Injectable()
 export class ExperiencesService {
-  constructor(@InjectRepository(Experience) private readonly imageExperienceRepo: Repository<Experience>) {}
+  private readonly logger: Logger = new Logger(ExperiencesService.name);
+  constructor(
+    @InjectRepository(Experience) private readonly imageExperienceRepo: Repository<Experience>,
+  ) {}
 
   // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE CADA IMAGEN DE EXPERIENCIA
   public mapExperienceImages = (experiences: Experience[]): ImageMetadataDto[] => {
@@ -85,23 +89,26 @@ export class ExperiencesService {
   }
 
   // BUSCAR IMAGENES POR ID
-  async findAllById(idTasker: string): Promise<{ mimeType: string; base64: string }[] | []> {
+  async findAllByIdBase64(idTasker: string): Promise<TDataImageBase64[] | []> {
     try {
       const imagesExp: Experience[] = await this.imageExperienceRepo.find({
         where: { tasker: { idTasker } },
       });
 
+      this.logger.debug(imagesExp);
+
       // SI NO HAY LONGITUD
       if (imagesExp.length === 0) return [];
 
       // SINO MAPEAR
-      return imagesExp.map(img => ({
-        mimeType: img.mimeType,
-        base64: img.imageBase64.toString('base64'),
-      }));
+      const allImagesTaskerBase64 = imagesExp.map(img =>({ mimeType: img.mimeType, base64: img.imageBase64.toString('base64')}) as TDataImageBase64,);
 
+      this.logger.debug(allImagesTaskerBase64);
+
+      return allImagesTaskerBase64;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack)
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
@@ -114,9 +121,12 @@ export class ExperiencesService {
         where: { idExperience },
       });
 
+      this.logger.debug(imageExp);
+
       if (!imageExp) return null;
 
-      return {
+      // OBJETO DE INFORMACION DE IMAGEN
+      const imagesTasker = {
         base64: imageExp?.imageBase64,
         id: imageExp.idExperience,
         mimeType: imageExp.mimeType,
@@ -124,8 +134,12 @@ export class ExperiencesService {
         systemFileName: imageExp.systemFileName,
       } as TTaskerImage;
 
+      this.logger.debug(imagesTasker);
+
+      return imagesTasker;
     } catch (error) {
       const err = error as HttpException;
+       this.logger.error(err.message, err.stack)
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }

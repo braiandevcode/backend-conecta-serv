@@ -31,7 +31,7 @@ export class UserService {
     private readonly locationService: LocationsService, //SERVICIO LOCATIONS
     private readonly roleService: RoleService, //SERVICIO ROLES
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   // CREAR DATOS BASICOS DE USUARIO (DEFAULT ROL CLIENTE)
   async create(
@@ -225,6 +225,8 @@ export class UserService {
     try {
       const userId: string = payload.sub;
 
+      this.logger.debug(userId);
+
       const user: User | null = await this.userRepository.findOne({
         where: { idUser: userId, active: true },
         relations: [
@@ -237,16 +239,20 @@ export class UserService {
           'taskerData.hoursData',
           'taskerData.categoryData',
           'taskerData.budgetData',
-          'taskerData.imageExperience'
+          'taskerData.imageExperience',
         ],
       });
+
+      this.logger.debug(user);
 
       if (!user) return null;
 
       const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
 
+      this.logger.debug(isTasker);
+
       // RETORNAR
-      return {
+      const dataUser: TDataPayloadUser = {
         sub: user.idUser,
         userName: user.userName,
         email: user.email,
@@ -260,18 +266,31 @@ export class UserService {
         // SOLO SI ES TASKER, con arrays vacíos si no hay datos
         days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
         hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
-        services: isTasker ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || [] : [],
-        worksArea: isTasker ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [] : [],
+        services: isTasker
+          ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
+          : [],
+        worksArea: isTasker
+          ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
+          : [],
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
         budget: isTasker ? user.taskerData?.budgetData || null : null,
         description: isTasker ? user.taskerData?.description || '' : '',
-        profileImageUrl: isTasker ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image` : null,
-        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
+        profileImageUrl: isTasker
+          ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
+          : null,
+        experienceImagesUrl: user.taskerData?.imageExperience
+          ? user.taskerData.imageExperience.map(
+              img => `api/v1/tasker/experience/${img.idExperience}/image`,
+            )
           : [],
-      }
+      };
 
+      this.logger.debug(dataUser);
+
+      return dataUser;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
@@ -279,49 +298,70 @@ export class UserService {
 
   // LEER USUARIOS TASKERS ACTIVOS
   async getActiveUsersTasker(sub: string): Promise<TActiveTaskerUser[]> {
-    const users = await this.userRepository.find({
-      where: {
-        idUser: Not(sub),
-        active: true,
-        taskerData: Not(IsNull()),
-      },
-      relations: ['rolesData', 'taskerData', 'taskerData.imageExperience', 'taskerData.servicesData', 'taskerData.workAreasData', 'taskerData.daysData', 'taskerData.hoursData', 'taskerData.categoryData'],
-    });
+    try {
+      const users = await this.userRepository.find({
+        where: {
+          idUser: Not(sub),
+          active: true,
+          taskerData: Not(IsNull()),
+        },
+        relations: [
+          'rolesData',
+          'taskerData',
+          'taskerData.imageExperience',
+          'taskerData.servicesData',
+          'taskerData.workAreasData',
+          'taskerData.daysData',
+          'taskerData.hoursData',
+          'taskerData.categoryData',
+        ],
+      });
 
-    return users.map(u => ({
-      idUser: u.idUser,
-      fullName: u.fullName,
-      userName: u.userName,
+      this.logger.debug(users);
 
-      roles: u.rolesData?.map(r => ({
-        idRole: r.idRole,
-        nameRole: r.nameRole,
-      })),
+      // USUARIOS ACTIVOS CON ROL TASKER
+      const allDataUsers: TActiveTaskerUser[] = users.map(u => ({
+        idUser: u.idUser,
+        fullName: u.fullName,
+        userName: u.userName,
+        roles: u.rolesData?.map(r => ({
+          idRole: r.idRole,
+          nameRole: r.nameRole,
+        })),
 
-      tasker: {
-        idTasker: u.taskerData?.idTasker,
-        description: u.taskerData?.description,
-        idCategory: u.taskerData?.idCategory,
-      },
+        tasker: {
+          idTasker: u.taskerData?.idTasker,
+          description: u.taskerData?.description,
+          idCategory: u.taskerData?.idCategory,
+        },
 
-      days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
-      hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
-      services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
-      worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
-      category: u.taskerData?.categoryData?.categoryName || '',
+        days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
+        hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
+        services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
+        worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
+        category: u.taskerData?.categoryData?.categoryName || '',
 
-      profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
-      experienceImagesUrl: u.taskerData?.imageExperience ? u.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
-        : [],
-    })) as TActiveTaskerUser[];
+        profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
+        experienceImagesUrl: u.taskerData?.imageExperience
+          ? u.taskerData.imageExperience.map(
+              img => `api/v1/tasker/experience/${img.idExperience}/image`,
+            )
+          : [],
+      })) as TActiveTaskerUser[];
+
+      this.logger.debug(allDataUsers);
+
+      return allDataUsers;
+    } catch (error) {
+      const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
   }
 
   async findOne(id: number) {
     return `This action returns a #${id} user`;
-  }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
   }
 
   remove(id: number) {

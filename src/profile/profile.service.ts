@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
 import { Profile } from './entities/profile.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -7,13 +7,16 @@ import { randomUUID } from 'crypto';
 import path from 'path'; //MODULO DE NODE
 import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
+import { TDataImageBase64 } from 'src/types/typeDataImageBase64';
 
 @Injectable()
 export class ProfileService {
+  private readonly logger: Logger = new Logger(ProfileService.name);
   constructor(@InjectRepository(Profile) private readonly imageProfileRepo: Repository<Profile>) {}
 
   // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE PERFIL
   public mapProfileImage = (profile: Profile | null): ImageMetadataDto | null => {
+    this.logger.debug(profile);
     if (!profile) return null;
     return {
       idImage: profile.idProfile,
@@ -53,11 +56,15 @@ export class ProfileService {
         tasker: { idTasker },
       });
 
+      this.logger.debug(newImageProfile);
+
       const savedImageProfile: Profile = await repo.save(newImageProfile);
 
       return savedImageProfile; //RETORNAR ENTIDAD GUARDADA
     } catch (error) {
       const err = error as HttpException;
+
+      this.logger.error(err.name, err.stack);
       // SI EL ERROR YA FUE MANEJADO POR ERRORMANAGER, LO RELANZO TAL CUAL
       if (err instanceof ErrorManager) throw err;
 
@@ -67,20 +74,27 @@ export class ProfileService {
   }
 
   // BUSCAR IMAGEN POR ID
-  async findOne(idTasker: string): Promise<{ mimeType: string; base64: string } | null> {
+  async findOneImageBase64(idTasker: string): Promise<TDataImageBase64 | null> {
     try {
       const imageProfile: Profile | null = await this.imageProfileRepo.findOne({
         where: { tasker: { idTasker } },
       });
 
+      this.logger.debug(imageProfile);
+
       if (!imageProfile) return null;
 
-      return {
+      const imageProfileBase64: TDataImageBase64 = {
         mimeType: imageProfile.mimeType,
         base64: imageProfile.imageBase64.toString('base64'),
       };
+
+      this.logger.debug(imageProfileBase64);
+
+      return imageProfileBase64;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
@@ -89,21 +103,28 @@ export class ProfileService {
   // LEER LA IMAGEN DEL PERFIL DEL TASKER
   async getProfileByTasker(idTasker: string): Promise<TTaskerImage | null> {
     try {
-      const imageProfile: Profile  | null = await this.imageProfileRepo.findOne({
+      const imageProfile: Profile | null = await this.imageProfileRepo.findOne({
         where: { tasker: { idTasker } },
       });
 
-      if(!imageProfile) return null;
+      this.logger.debug(imageProfile);
 
-       return {
+      if (!imageProfile) return null;
+
+      const imageProfileTasker = {
         base64: imageProfile.imageBase64,
         id: imageProfile.idProfile,
         mimeType: imageProfile.mimeType,
         originalName: imageProfile.originalName,
         systemFileName: imageProfile.systemFileName,
       } as TTaskerImage;
+
+      this.logger.debug(imageProfileTasker);
+
+      return imageProfileTasker;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }

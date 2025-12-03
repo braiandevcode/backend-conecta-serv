@@ -8,6 +8,6 @@ export class ExperiencesController {
   @Get('experiences/:idTasker')
   @UseGuards(AuthGuard('jwt'))
   async findAllById(idTasker: string): Promise<{ mimeType:string, base64:string }[] | []> {
-    return await this.experiencesService.findAllById(idTasker);
+    return await this.experiencesService.findAllByIdBase64(idTasker);
   }
 }
