@@ -239,7 +239,6 @@ export class UserService {
           'taskerData.hoursData',
           'taskerData.categoryData',
           'taskerData.budgetData',
-          'taskerData.imageExperience',
         ],
       });
 
@@ -297,7 +296,7 @@ export class UserService {
   }
 
   // LEER USUARIOS TASKERS ACTIVOS
-  async getActiveUsersTasker(sub: string): Promise<TActiveTaskerUser[]> {
+  async getActiveUsersTaskerProfile(sub: string): Promise<TActiveTaskerUser[]> {
     try {
       const users = await this.userRepository.find({
         where: {
@@ -308,7 +307,6 @@ export class UserService {
         relations: [
           'rolesData',
           'taskerData',
-          'taskerData.imageExperience',
           'taskerData.servicesData',
           'taskerData.workAreasData',
           'taskerData.daysData',
@@ -342,11 +340,6 @@ export class UserService {
         category: u.taskerData?.categoryData?.categoryName || '',
 
         profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
-        experienceImagesUrl: u.taskerData?.imageExperience
-          ? u.taskerData.imageExperience.map(
-              img => `api/v1/tasker/experience/${img.idExperience}/image`,
-            )
-          : [],
       })) as TActiveTaskerUser[];
 
       this.logger.debug(allDataUsers);

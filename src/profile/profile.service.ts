@@ -87,6 +87,7 @@ export class ProfileService {
       const imageProfileBase64: TDataImageBase64 = {
         mimeType: imageProfile.mimeType,
         base64: imageProfile.imageBase64.toString('base64'),
+        fileName: imageProfile.systemFileName,
       };
 
       this.logger.debug(imageProfileBase64);

@@ -101,7 +101,7 @@ export class ExperiencesService {
       if (imagesExp.length === 0) return [];
 
       // SINO MAPEAR
-      const allImagesTaskerBase64 = imagesExp.map(img =>({ mimeType: img.mimeType, base64: img.imageBase64.toString('base64')}) as TDataImageBase64,);
+      const allImagesTaskerBase64 = imagesExp.map(img =>({ mimeType: img.mimeType, base64: img.imageBase64.toString('base64'), fileName:img.systemFileName }) as TDataImageBase64,);
 
       this.logger.debug(allImagesTaskerBase64);
 

@@ -76,7 +76,7 @@ export class UserController {
   @UseGuards(AuthGuard('jwt'))
   async getActiveUsers(@Req() req: Request & { user: iJwtPayload }): Promise<TActiveTaskerUser[]> {
     const userId = req.user.sub;
-    return this.userService.getActiveUsersTasker(userId);
+    return this.userService.getActiveUsersTaskerProfile(userId);
   }
 
   // IDENTIFICAR UN USUARIO POR SU EMAIL

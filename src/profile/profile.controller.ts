@@ -11,7 +11,6 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Controller('api/v1/')
 export class ProfileController {
-  private readonly logger: Logger = new Logger(ProfileController.name);
   constructor(private readonly profileService: ProfileService) {}
 
   @Get('profile/:idTasker')
