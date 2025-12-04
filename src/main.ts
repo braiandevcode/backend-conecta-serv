@@ -12,7 +12,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Authorization'],
   });
-
+ 
   // ES UN MIDDLEWARE DE COOKIES
   app.use(cookieParser());
 
