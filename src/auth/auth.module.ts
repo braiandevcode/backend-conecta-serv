@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { RefreshTokensModule } from 'src/refresh-tokens/refresh-tokens.module';
 import { UserModule } from 'src/user/user.module';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
+import { ConfigAuthCookie } from './constants/configAuth.service';
 
 @Module({
   imports:[
@@ -26,7 +27,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
       }),
     }),
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy],
+  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy, ConfigAuthCookie],
   controllers: [AuthController],
 })
 export class AuthModule {}

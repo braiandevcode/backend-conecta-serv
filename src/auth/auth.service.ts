@@ -57,7 +57,7 @@ export class AuthService {
   // SIGN IN: GENERA ACCESS TOKEN + REFRESH Y GUARDA EL REFRESH EN DB
   async signIn(userPayload: iJwtPayload, ip?: string, userAgent?: string): Promise<{ accessToken: string; refreshToken: string } | null> {
     // GENERAR ACCESS TOKEN
-    const accessToken: string =  this.jwtService.sign(userPayload, { expiresIn: '15m'});
+    const accessToken: string = this.jwtService.sign(userPayload, { expiresIn: '15m'});
     
     this.logger.debug(accessToken);
 

@@ -8,19 +8,20 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
-import type { Request, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { iJwtPayload } from './interface/iJwtPayload';
-import { configAuthCookie } from './constants/configAuthCookie';
+
 import { iAccessToken } from './interface/iAccessToken';
 import { RefreshToken } from 'src/refresh-tokens/entities/refresh-token.entity';
 import { User } from 'src/user/entities/user.entity';
 import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
+import { ConfigAuthCookie } from './constants/configAuth.service';
 
 
 // CON passthrough: true, Nest PERMITE USAR res.cookie() PERO SEGUIR DEVOLVIENDO UN RETURN NORMALMENTE
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, private readonly configAuthService:ConfigAuthCookie) {}
 
   // LOGIN CON USERNAME Y PASSWORD
   @Post('/login')
@@ -31,6 +32,7 @@ export class AuthController {
   ): Promise<iAccessToken | null> {
     // OBTENER OBJETO DEL USUARIO VALIDADO POR PASSPORT
     const user = req.user as iJwtPayload;
+    
     // OBTENER IP Y USER-AGENT (OPCIONAL) PARA GUARDAR EN REFRESH TOKEN
     const ip: string | undefined = req.ip;
 
@@ -43,6 +45,9 @@ export class AuthController {
     if (!data) return null;
 
     const { accessToken, refreshToken } = data;
+
+    // LLAMO AL SERVICIO DE CONFIGURACION DE COOKIE
+    const configAuthCookie:CookieOptions = this.configAuthService.configurationHttpOnlyCookieParser(); 
 
     // CONFIGURO LA COOKIE
     res.cookie('refresh_token', refreshToken, configAuthCookie);
