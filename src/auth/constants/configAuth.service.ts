@@ -15,7 +15,7 @@ export class ConfigAuthCookie {
       path: '/', //RUTA PARA ESTA ASIGNACION
       maxAge: ONE_WEEK_IN_MS, //EXPIRACION DE COOKIE
       sameSite: 'none', // SI ESTA EN PRODUCCION SERA ESTRICTO SINO LAX
-      secure: process.env.NODE_ENV === 'production', //SEGURIDAD CON HTTPS SI ESTA EN PRODUCCION
+      secure:true, //SEGURIDAD CON HTTPS SI ESTA EN PRODUCCION
     };
     return configAuthCookie;
   }
