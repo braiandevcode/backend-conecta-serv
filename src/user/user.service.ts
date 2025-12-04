@@ -193,7 +193,7 @@ export class UserService {
     }
   }
 
-  // BUSCAR SOLO EL USUARIO EN LA TABLA DE USUARIOS ACTIVOS
+  //MOSTAR USUARIOS QUE ESTEN ACTIVOS POR NOMBRE DE USUARIO
   async findByUserNameActiveForAuth({ userName }: { userName: string }): Promise<User | null> {
     try {
       // CONSULTA
@@ -220,7 +220,7 @@ export class UserService {
     }
   }
 
-  //LEER DATOS DEL USUARIO PARA CARGAR DATOS LUEGO DEL LOGIN
+  //LEER DATOS DEL USUARIO QUE HACE LOGIN
   async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
     try {
       const userId: string = payload.sub;
@@ -235,12 +235,15 @@ export class UserService {
           'taskerData',
           'taskerData.servicesData',
           'taskerData.workAreasData',
+          "taskerData.imageExperience",  //BUSCAR EXPLICITAMENTE ES "CARGA PEREZOSA" UNO A MUCHO O MUCHOS A MUCHOS
           'taskerData.daysData',
           'taskerData.hoursData',
           'taskerData.categoryData',
           'taskerData.budgetData',
         ],
       });
+
+      // NOTA: EN PERFIL NO, UNO A UNO O MUCHOS A UNO "CARGA ANCIOSA"
 
       this.logger.debug(user);
 
@@ -262,7 +265,6 @@ export class UserService {
         })),
 
         isTasker, //SI ES TASKER
-        // SOLO SI ES TASKER, con arrays vacíos si no hay datos
         days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
         hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
         services: isTasker
@@ -274,14 +276,9 @@ export class UserService {
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
         budget: isTasker ? user.taskerData?.budgetData || null : null,
         description: isTasker ? user.taskerData?.description || '' : '',
-        profileImageUrl: isTasker
-          ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
-          : null,
-        experienceImagesUrl: user.taskerData?.imageExperience
-          ? user.taskerData.imageExperience.map(
-              img => `api/v1/tasker/experience/${img.idExperience}/image`,
-            )
-          : [],
+        profileImageUrl: isTasker ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`: null,
+        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
+        : [],
       };
 
       this.logger.debug(dataUser);
