@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { DataSource, IsNull, Not, Repository } from 'typeorm';
+import { DataSource, Equal, IsNull, Not, Repository } from 'typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
 import { Role } from 'src/role/entities/role.entity';
 import { Location } from 'src/location/entities/location.entity';
@@ -20,6 +20,7 @@ import { ESeparatorsMsgErrors } from 'src/common/enums/enumSeparatorMsgErrors';
 import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
 import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
 import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
+import { TDataPayloadTaskerSingle } from 'src/types/typeDataPayloadTaskerSingle';
 
 @Injectable()
 export class UserService {
@@ -139,10 +140,6 @@ export class UserService {
     }
   }
 
-  findAll() {
-    return `This action returns all user`;
-  }
-
   // BUSCAR SOLO EL EMAIL EN LA TABLA USERS SIN CRITERIOS DE ACTIVO O NO
   async getUserEmail({ email }: { email: string }): Promise<User | null> {
     try {
@@ -235,7 +232,7 @@ export class UserService {
           'taskerData',
           'taskerData.servicesData',
           'taskerData.workAreasData',
-          "taskerData.imageExperience",  //BUSCAR EXPLICITAMENTE ES "CARGA PEREZOSA" UNO A MUCHO O MUCHOS A MUCHOS
+          'taskerData.imageExperience', //BUSCAR EXPLICITAMENTE ES "CARGA PEREZOSA" UNO A MUCHO O MUCHOS A MUCHOS
           'taskerData.daysData',
           'taskerData.hoursData',
           'taskerData.categoryData',
@@ -276,9 +273,14 @@ export class UserService {
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
         budget: isTasker ? user.taskerData?.budgetData || null : null,
         description: isTasker ? user.taskerData?.description || '' : '',
-        profileImageUrl: isTasker ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`: null,
-        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
-        : [],
+        profileImageUrl: isTasker
+          ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
+          : null,
+        experienceImagesUrl: user.taskerData?.imageExperience
+          ? user.taskerData.imageExperience.map(
+              img => `api/v1/tasker/experience/${img.idExperience}/image`,
+            )
+          : [],
       };
 
       this.logger.debug(dataUser);
@@ -293,7 +295,7 @@ export class UserService {
   }
 
   // LEER USUARIOS TASKERS ACTIVOS
-  async getActiveUsersTaskerProfile(sub: string): Promise<TActiveTaskerUser[]> {
+  async getAllActiveUsersTaskerProfile(sub: string): Promise<TActiveTaskerUser[]> {
     try {
       const users = await this.userRepository.find({
         where: {
@@ -342,6 +344,87 @@ export class UserService {
       this.logger.debug(allDataUsers);
 
       return allDataUsers;
+    } catch (error) {
+      const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
+  }
+
+  //LEER DATOS DE UN USUARIO TASKER CONCRETO
+  async getTaskerSingle(idTasker: string): Promise<TDataPayloadTaskerSingle | null> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: {
+          taskerData: {idTasker: Equal(idTasker) }, //COMPARA ESTRICAMENTE EL VALOR
+          active: true,
+        },
+        relations: [
+          'rolesData',
+          'locationData',
+          'taskerData',
+          'taskerData.servicesData',
+          'taskerData.workAreasData',
+          'taskerData.imageExperience',
+          'taskerData.budgetData',
+          'taskerData.daysData',
+          'taskerData.hoursData',
+          'taskerData.categoryData',
+        ],
+      });
+
+      // SI NO EXISTE UUSUARIO
+      if (!user) {
+        throw ErrorManager.createSignatureError(`NOT_FOUNF${ESeparatorsMsgErrors.SEPARATOR}Tasker con ID ${idTasker} no encontrado.`);    
+      }
+
+      const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
+      const isRepair: boolean = user.taskerData.categoryData.categoryName === 'reparacion-mantenimiento';
+      const isWorkAreas: boolean = user.taskerData.workAreasData.length > 0; //SI VIENEN DATOS DE HABITOS
+
+      this.logger.debug(isTasker);
+      // RETORNAR
+      const dataUser: TDataPayloadTaskerSingle = {
+        sub: user.idUser,
+        userName: user.userName,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.rolesData?.map(r => ({
+          idRole: r.idRole,
+          nameRole: r.nameRole,
+        })),
+
+        isWorkAreas,
+        isRepair, //SI ES CATEGORIA REPARACIONES
+        isTasker, //SI ES TASKER
+        taskerId: user.taskerData.idTasker,
+        days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
+        hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
+        services: isTasker
+          ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
+          : [],
+        worksArea: isTasker
+          ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
+          : [],
+        category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
+        budget: isTasker ? user.taskerData?.budgetData || null : null,
+        description: isTasker ? user.taskerData?.description || '' : '',
+        profileImageUrl: isTasker
+          ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
+          : null,
+        experienceImagesUrl: user.taskerData?.imageExperience
+          ? user.taskerData.imageExperience.map(
+              img => `api/v1/tasker/experience/${img.idExperience}/image`,
+            )
+          : [],
+        city: user.locationData.cityName,
+      };
+      
+
+      this.logger.debug(dataUser);
+
+      return dataUser;
     } catch (error) {
       const err = error as HttpException;
       this.logger.error(err.message, err.stack);
