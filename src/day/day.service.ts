@@ -25,7 +25,7 @@ export class DayService {
       // SERVICIO UTILS QUE YA VALIDA INTERNAMENTE
       return await this.entityCreatorService.findOrCreateEntitiesByNames({
         keyNames: days,
-        keyName: 'dayName',
+        keyName: 'dayName',//YO SOLO QUIERO EVALUAR EL VALOR DEL NOMBRE DEL DIA
         repo,
         validValues: VALID_DAYS,
       });
