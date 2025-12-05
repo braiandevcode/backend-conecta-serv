@@ -24,6 +24,7 @@ import { iMessageResponseStatus } from 'src/code/interface/iMessagesResponseStat
 import { AuthGuard } from '@nestjs/passport';
 import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
 import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
+import { TDataPayloadTaskerSingle } from 'src/types/typeDataPayloadTaskerSingle';
 
 @Controller('api/v1')
 export class UserController {
@@ -62,7 +63,9 @@ export class UserController {
     const experienceFiles: Express.Multer.File[] = files.imageExperiences || [];
 
     // EXTRAER Y APLICAR EL PIPE SOLO EN IMAGENES DE EXPERIENCIAS
-    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(experienceFiles);
+    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(
+      experienceFiles,
+    );
     //LLAMAR AL SERVICIO
     return this.userService.create(
       profileFile, //ARCHIVO PERFIL
@@ -76,7 +79,7 @@ export class UserController {
   @UseGuards(AuthGuard('jwt'))
   async getActiveUsers(@Req() req: Request & { user: iJwtPayload }): Promise<TActiveTaskerUser[]> {
     const userId = req.user.sub;
-    return this.userService.getActiveUsersTaskerProfile(userId);
+    return this.userService.getAllActiveUsersTaskerProfile(userId);
   }
 
   // IDENTIFICAR UN USUARIO POR SU EMAIL
@@ -87,17 +90,11 @@ export class UserController {
     return await this.userService.getUserEmailActive(userIdentifyEmailDto);
   }
 
-  // LEER TODOS LOS USUARIOS (SIN IMPLEMENTAR)
-  @Get('/users')
-  findAll() {
-    return this.userService.findAll();
-  }
-
-  // BUSCAR USUARIO POR ID (SIN IMPLEMENTAR)
-  @Get('/users/:id')
+  // ENDPOINT PARA UN USUARIO COMUN (CLIENTE) VER PERFIL DE TASKER POR SELECCION
+  @Get('/users/tasker/:idTasker/details')
   @UseGuards(AuthGuard('jwt'))
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
+  async findOne(@Param('idTasker') idTasker: string): Promise<TDataPayloadTaskerSingle | null> {
+    return await this.userService.getTaskerSingle(idTasker);
   }
 
   // ELIMNAR DE FORMA FISICA UN USUARIO SIN IMPLEMENTAR
