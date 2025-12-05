@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
 import { ECategory } from 'src/common/enums/enumCategory';
+import { ESeparatorsMsgErrors } from 'src/common/enums/enumSeparatorMsgErrors';
 
 @Injectable()
 export class BudgetService {
@@ -34,6 +35,8 @@ export class BudgetService {
           reinsertSelected,
           budgeSelected,
         });
+      }else{
+        ErrorManager.createSignatureError(`BAD_REQUEST${ESeparatorsMsgErrors.SEPARATOR} No se permiten datos para esta categoria`)
       }
 
       return budgeTasker;

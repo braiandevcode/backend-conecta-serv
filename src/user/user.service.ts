@@ -21,6 +21,7 @@ import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
 import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
 import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
 import { TDataPayloadTaskerSingle } from 'src/types/typeDataPayloadTaskerSingle';
+import { TBudgetData } from 'src/types/typeBudgetData';
 
 @Injectable()
 export class UserService {
@@ -48,6 +49,7 @@ export class UserService {
     await queryRunner.connect(); // ==> CONEXION
     await queryRunner.startTransaction(); // ==> INICIO DE LA TRANSACCIÓN
 
+    
     try {
       // VERIFICAR SI EL USUARIO YA EXISTE Y SI EL ACTIVE ESTA EN TRUE
       // BUSCO EN LA TABLA DE USUARIOS POR EMAIL
@@ -357,7 +359,7 @@ export class UserService {
     try {
       const user = await this.userRepository.findOne({
         where: {
-          taskerData: {idTasker: Equal(idTasker) }, //COMPARA ESTRICAMENTE EL VALOR
+          taskerData: { idTasker: Equal(idTasker) }, //COMPARA ESTRICAMENTE EL VALOR
           active: true,
         },
         relations: [
@@ -376,14 +378,26 @@ export class UserService {
 
       // SI NO EXISTE UUSUARIO
       if (!user) {
-        throw ErrorManager.createSignatureError(`NOT_FOUNF${ESeparatorsMsgErrors.SEPARATOR}Tasker con ID ${idTasker} no encontrado.`);    
+        throw ErrorManager.createSignatureError(
+          `NOT_FOUNF${ESeparatorsMsgErrors.SEPARATOR}Tasker con ID ${idTasker} no encontrado.`,
+        );
       }
 
       const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
-      const isRepair: boolean = user.taskerData.categoryData.categoryName === 'reparacion-mantenimiento';
+      const isRepair: boolean =
+        user.taskerData.categoryData.categoryName === 'reparacion-mantenimiento';
       const isWorkAreas: boolean = user.taskerData.workAreasData.length > 0; //SI VIENEN DATOS DE HABITOS
 
       this.logger.debug(isTasker);
+
+      // DEFINIR ANTES PARA EVITAR PROBLEMAS DE TIPOS EN OBJETO A RETORNAR
+      const sectionBudget:TBudgetData = {
+        idBudget: user.taskerData.budgetData?.idBudget ?? null,
+        amount: user.taskerData.budgetData?.amount ?? 0,
+        budgeSelected: user.taskerData.budgetData?.budgeSelected ?? 'no',
+        reinsertSelected: user.taskerData.budgetData?.reinsertSelected ?? 'no',
+      };
+
       // RETORNAR
       const dataUser: TDataPayloadTaskerSingle = {
         sub: user.idUser,
@@ -394,7 +408,6 @@ export class UserService {
           idRole: r.idRole,
           nameRole: r.nameRole,
         })),
-
         isWorkAreas,
         isRepair, //SI ES CATEGORIA REPARACIONES
         isTasker, //SI ES TASKER
@@ -408,7 +421,7 @@ export class UserService {
           ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
           : [],
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
-        budget: isTasker ? user.taskerData?.budgetData || null : null,
+        budget: sectionBudget ?? null,
         description: isTasker ? user.taskerData?.description || '' : '',
         profileImageUrl: isTasker
           ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
@@ -420,7 +433,6 @@ export class UserService {
           : [],
         city: user.locationData.cityName,
       };
-      
 
       this.logger.debug(dataUser);
 

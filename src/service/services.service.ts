@@ -36,7 +36,7 @@ export class ServicesService {
       // SERVICIO UTILS QUE YA VALIDA INTERNAMENTE
       return await this.entityCreatorService.findOrCreateEntitiesByNames({
         keyNames: services,
-        keyName: 'serviceName',
+        keyName: 'serviceName', //YO SOLO QUIERO EVALUAR EL VALOR DEL NOMBRE DEL SERVICO
         repo,
         validValues: SERVICES_BY_CATEGORY[category],
       });

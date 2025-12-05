@@ -1,4 +1,5 @@
 import { Budget } from 'src/budget/entities/budget.entity';
+import { TBudgetData } from './typeBudgetData';
 
 export type TDataPayloadUser = {
   sub: string;
@@ -18,7 +19,7 @@ export type TDataPayloadUser = {
   services: string[];
   worksArea: string[];
   category: string | null;
-  budget: Budget | null;
+  budget:TBudgetData| null;
   description: string | null;
 
   profileImageUrl: string | null;

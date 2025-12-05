@@ -1,5 +1,6 @@
 export type TBudgetData = {
-  amountBudget: number;
-  budgeSelected: string;
-  reinsert: string;
+  idBudget: string | undefined | null;
+  budgeSelected: string | undefined | null;
+  reinsertSelected: string | undefined | null;
+  amount: number;
 };
