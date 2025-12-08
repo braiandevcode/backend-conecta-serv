@@ -1,4 +1,3 @@
-import { Tasker } from "src/tasker/entities/tasker.entity";
 import { TDataPayloadUser } from "./typeDataPayloadUser";
 
 // FIRMA DE ESTRUCTURA DE DATOS DE UN SOLO TASKER

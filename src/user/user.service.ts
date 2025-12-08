@@ -49,7 +49,6 @@ export class UserService {
     await queryRunner.connect(); // ==> CONEXION
     await queryRunner.startTransaction(); // ==> INICIO DE LA TRANSACCIÓN
 
-    
     try {
       // VERIFICAR SI EL USUARIO YA EXISTE Y SI EL ACTIVE ESTA EN TRUE
       // BUSCO EN LA TABLA DE USUARIOS POR EMAIL
@@ -308,6 +307,7 @@ export class UserService {
         relations: [
           'rolesData',
           'taskerData',
+          'taskerData.budgetData',
           'taskerData.servicesData',
           'taskerData.workAreasData',
           'taskerData.daysData',
@@ -319,30 +319,40 @@ export class UserService {
       this.logger.debug(users);
 
       // USUARIOS ACTIVOS CON ROL TASKER
-      const allDataUsers: TActiveTaskerUser[] = users.map(u => ({
-        idUser: u.idUser,
-        fullName: u.fullName,
-        userName: u.userName,
-        roles: u.rolesData?.map(r => ({
-          idRole: r.idRole,
-          nameRole: r.nameRole,
-        })),
+      const allDataUsers: TActiveTaskerUser[] = users.map(u => {
+        // DEFINIR ANTES PARA EVITAR PROBLEMAS DE TIPOS EN OBJETO A RETORNAR
+        const sectionBudget: TBudgetData = {
+          idBudget: u.taskerData.budgetData?.idBudget ?? null,
+          amount: u.taskerData.budgetData?.amount ?? 0,
+          budgeSelected: u.taskerData.budgetData?.budgeSelected ?? 'no',
+          reinsertSelected: u.taskerData.budgetData?.reinsertSelected ?? 'no',
+        };
 
-        tasker: {
-          idTasker: u.taskerData?.idTasker,
-          description: u.taskerData?.description,
-          idCategory: u.taskerData?.idCategory,
-        },
+        return {
+          idUser: u.idUser,
+          fullName: u.fullName,
+          userName: u.userName,
+          roles: u.rolesData?.map(r => ({
+            idRole: r.idRole,
+            nameRole: r.nameRole,
+          })),
 
-        days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
-        hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
-        services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
-        worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
-        category: u.taskerData?.categoryData?.categoryName || '',
+          tasker: {
+            idTasker: u.taskerData?.idTasker,
+            description: u.taskerData?.description,
+            idCategory: u.taskerData?.idCategory,
+          },
 
-        profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
-      })) as TActiveTaskerUser[];
+          budget: sectionBudget ?? null,
+          days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
+          hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
+          services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
+          worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
+          category: u.taskerData?.categoryData?.categoryName || '',
 
+          profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
+        } as TActiveTaskerUser;
+      });
       this.logger.debug(allDataUsers);
 
       return allDataUsers;
@@ -391,7 +401,7 @@ export class UserService {
       this.logger.debug(isTasker);
 
       // DEFINIR ANTES PARA EVITAR PROBLEMAS DE TIPOS EN OBJETO A RETORNAR
-      const sectionBudget:TBudgetData = {
+      const sectionBudget: TBudgetData = {
         idBudget: user.taskerData.budgetData?.idBudget ?? null,
         amount: user.taskerData.budgetData?.amount ?? 0,
         budgeSelected: user.taskerData.budgetData?.budgeSelected ?? 'no',
