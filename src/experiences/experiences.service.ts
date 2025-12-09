@@ -8,6 +8,7 @@ import { ErrorManager } from 'src/config/ErrorMannager';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
 import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
 import { TDataImageBase64 } from 'src/types/typeDataImageBase64';
+import { ESeparatorsMsgErrors } from 'src/common/enums/enumSeparatorMsgErrors';
 
 @Injectable()
 export class ExperiencesService {
@@ -101,14 +102,20 @@ export class ExperiencesService {
       if (imagesExp.length === 0) return [];
 
       // SINO MAPEAR
-      const allImagesTaskerBase64 = imagesExp.map(img =>({ mimeType: img.mimeType, base64: img.imageBase64.toString('base64') }) as TDataImageBase64,);
+      const allImagesTaskerBase64 = imagesExp.map(
+        img =>
+          ({
+            mimeType: img.mimeType,
+            base64: img.imageBase64.toString('base64'),
+          }) as TDataImageBase64,
+      );
 
       this.logger.debug(allImagesTaskerBase64);
 
       return allImagesTaskerBase64;
     } catch (error) {
       const err = error as HttpException;
-      this.logger.error(err.message, err.stack)
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
@@ -139,7 +146,24 @@ export class ExperiencesService {
       return imagesTasker;
     } catch (error) {
       const err = error as HttpException;
-       this.logger.error(err.message, err.stack)
+      this.logger.error(err.message, err.stack);
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
+  }
+
+  // ELIMINAR IMAGEN POR ID
+  async deleteImageExpById(idExperience: string): Promise<void> {
+    try {
+      const deleteImage = await this.imageExperienceRepo.delete({ idExperience });
+      if (deleteImage.affected === 0) {
+        throw ErrorManager.createSignatureError(
+          `BAD_REQUEST${ESeparatorsMsgErrors.SEPARATOR}No se encontró id para eliminar`,
+        );
+      }
+    } catch (error) {
+      const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
