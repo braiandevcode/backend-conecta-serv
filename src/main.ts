@@ -6,9 +6,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: [`${process.env.FE_HOST}`, 'https://conecta-serv-ivory.vercel.app'], // FRONTEND
+    origin: ['https://conecta-serv-ivory.vercel.app'], // FRONTEND
     credentials: true, // SI SE USA COOKIES / HEADERS
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Authorization'],
   });
