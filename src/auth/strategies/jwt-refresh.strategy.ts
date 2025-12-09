@@ -30,6 +30,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
   // VALIDACION
   async validate(req:Request, payload:iJwtPayload) {
+    if (req.method === 'OPTIONS') return true;
     const refreshToken = req.cookies['refresh_token'];
     // SI NO HAY TOKEN
     if(!refreshToken){
