@@ -15,7 +15,7 @@ export class ProfileController {
 
   @Get('profile/:idTasker')
   @UseGuards(AuthGuard('jwt'))
-  async findOne(@Param('idTasker') idTasker: string): Promise<{ mimeType: string; base64: string } | null> {
+  async findOne(idTasker: string): Promise<{ mimeType: string; base64: string } | null> {
     return await this.profileService.findOneImageBase64(idTasker);
   }
 }
