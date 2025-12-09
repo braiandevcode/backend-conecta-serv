@@ -11,11 +11,13 @@ export class TaskersController {
   constructor(private readonly taskerService: TaskersService) {}
 
   @Get('tasker/profile/:idTasker/image')
+  @UseGuards(AuthGuard('jwt'))
   async getProfileImag(@Param('idTasker') idTasker: string): Promise<TTaskerImage | null> {
     return this.taskerService.getProfileImage(idTasker);
   }
 
   @Get('tasker/experience/:idExperience/image')
+  @UseGuards(AuthGuard('jwt'))
   async getSingleExperienceImage(@Param('idExperience') idExperience: string): Promise<TTaskerImage | null> {
     // DELEGAR
     return await this.taskerService.getSingleExperienceImage(idExperience);
