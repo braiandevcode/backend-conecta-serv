@@ -93,7 +93,7 @@ export class UserController {
   // ENDPOINT PARA UN USUARIO COMUN (CLIENTE) VER PERFIL DE TASKER POR SELECCION
   @Get('/users/tasker/:idTasker/details')
   @UseGuards(AuthGuard('jwt'))
-  async findOne(idTasker: string): Promise<TDataPayloadTaskerSingle | null> {
+  async findOne(@Param('idTasker') idTasker: string): Promise<TDataPayloadTaskerSingle | null> {
     return await this.userService.getTaskerSingle(idTasker);
   }
 

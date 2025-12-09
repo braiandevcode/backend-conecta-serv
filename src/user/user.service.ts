@@ -389,7 +389,7 @@ export class UserService {
       // SI NO EXISTE UUSUARIO
       if (!user) {
         throw ErrorManager.createSignatureError(
-          `NOT_FOUNF${ESeparatorsMsgErrors.SEPARATOR}Tasker con ID ${idTasker} no encontrado.`,
+          `NOT_FOUND${ESeparatorsMsgErrors.SEPARATOR}Tasker con ID ${idTasker} no encontrado.`,
         );
       }
 
