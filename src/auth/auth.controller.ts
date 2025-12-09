@@ -79,10 +79,20 @@ export class AuthController {
 
   // LOGOUT ==> REVOCAR UN REFRESH TOKEN
   @Post('/logout')
-  async logout(@Req() req: Request): Promise<void> {
+  async logout(@Res() res:Response, @Req() req: Request): Promise<{ message: string}> {
     const refreshToken = req.cookies['refresh_token'];
     // LLAMAR AL SERVICE PARA ELIMINAR EL REFRESH TOKEN DE LA DB
-    return this.authService.logout(refreshToken);
+    await this.authService.logout(refreshToken);
+
+     // 🔥 borrar cookie en navegador
+  res.clearCookie('refresh_token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/', // igual que cuando la seteaste
+  });
+
+  return { message: 'Logged out' };
   }
 
   // CERRAR SESION EN TODOS LOS DISPOSITIVOS
