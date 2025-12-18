@@ -13,6 +13,13 @@ export type TActiveTaskerUser = {
     description: string | null;
     idCategory: string | null;
   };
+  
+  budget: {
+    idBudget: string;
+    budgeSelected: string;
+    reinsertSelected: string;
+    amount: number;
+  } | null;
 
   days: string[];
   hours: string[];
@@ -21,5 +28,4 @@ export type TActiveTaskerUser = {
   category: string;
 
   profileImageUrl: string;
-  experienceImagesUrl: string[];
 };

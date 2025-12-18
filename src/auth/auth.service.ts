@@ -1,4 +1,4 @@
-import {  Injectable } from '@nestjs/common';
+import {  Injectable, Logger } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
@@ -13,6 +13,7 @@ import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
 
 @Injectable()
 export class AuthService {
+   private readonly logger:Logger = new Logger(AuthService.name);
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -47,6 +48,8 @@ export class AuthService {
       roles: user.rolesData.map((role) => role.nameRole), // ARRAY DE NOMBRES DE ROLES
     };
 
+    this.logger.debug(payload);
+
     // RETORNAR EL PAYLOAD LIMPIO
     return payload;
   }
@@ -56,6 +59,9 @@ export class AuthService {
     // GENERAR ACCESS TOKEN
     const accessToken: string = this.jwtService.sign(userPayload, { expiresIn: '15m'});
     
+    this.logger.debug(accessToken);
+
+
     // CONFIGURAR REFRESH TOKEN
     /*
       - JWT_SECRET_REFRESH  ==> LLAVE SECRETA DISTINTA QUE FIRMARA LOS REFRESH TOKENS. ASI SI ALGUIEN ROBA UN ACCESS TOKEN, NO PUEDE USARLO PARA CREAR REFRESH TOKENS.
@@ -75,15 +81,20 @@ export class AuthService {
       expiresIn: refreshExpires,
     } as JwtSignOptions);
 
+    this.logger.debug({ refreshToken, refreshExpires });
+
+
     // CALCULAR FECHA DE EXPIRACION PARA DB
     const expiresAt: Date = new Date();
 
+    this.logger.debug(expiresAt);
     // SETEAR EN EXPIRES AT EL MOMENTO ACTUAL
     expiresAt.setTime(Date.now() + ONE_WEEK_IN_MS);
-
+    this.logger.debug(expiresAt);
+    
     // OBTENER ENTIDAD USER
     const user: User | null = await this.userService.findByUserNameActiveForAuth({ userName: userPayload.userName });
-    
+    this.logger.debug(user)
     if (!user) return null; //PASSPORT RETORNA EL 401
     
     // GUARDAR REFRESH TOKEN EN DB
@@ -117,8 +128,13 @@ export class AuthService {
       roles: user.rolesData.map((r) => r.nameRole),
     };
 
+    this.logger.debug(payload);
+
     // CREAR NUEVO ACCESS TOKEN
     const accessToken: string = this.jwtService.sign(payload);
+
+
+    this.logger.debug(accessToken);
 
     return { accessToken }; //RETORNAR OBJETO CON TOKEN NUEVO
   }

@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
-import { DataSource, IsNull, Not, Repository } from 'typeorm';
+import { DataSource, Equal, IsNull, Not, Repository } from 'typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
 import { Role } from 'src/role/entities/role.entity';
 import { Location } from 'src/location/entities/location.entity';
@@ -20,6 +20,8 @@ import { ESeparatorsMsgErrors } from 'src/common/enums/enumSeparatorMsgErrors';
 import { iJwtPayload } from 'src/auth/interface/iJwtPayload';
 import { TDataPayloadUser } from 'src/types/typeDataPayloadUser';
 import { TActiveTaskerUser } from 'src/types/typeDataTaskersProfile';
+import { TDataPayloadTaskerSingle } from 'src/types/typeDataPayloadTaskerSingle';
+import { TBudgetData } from 'src/types/typeBudgetData';
 
 @Injectable()
 export class UserService {
@@ -31,14 +33,10 @@ export class UserService {
     private readonly locationService: LocationsService, //SERVICIO LOCATIONS
     private readonly roleService: RoleService, //SERVICIO ROLES
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   // CREAR DATOS BASICOS DE USUARIO (DEFAULT ROL CLIENTE)
-  async create(
-    fileProfile: Express.Multer.File | null,
-    filesExp: Express.Multer.File[],
-    createUserDto: CreateUserDto,
-  ): Promise<Record<string, Omit<User, 'password'>>> {
+  async create(createUserDto: CreateUserDto): Promise<Record<string, Omit<User, 'password'>>> {
     // DESESTRUCTURO LOS DATOS QUE LLEGAN DEL FRONTEND
     const { email, userName, locationData, roleData, taskerData, password, ...restOfUserDto } =
       createUserDto;
@@ -56,12 +54,14 @@ export class UserService {
           { userName: userName }, // O EXISTE UN USUARIO CON ESTE USERNAME
         ],
       });
+      this.logger.debug('EXISTE USUARIO: ', existingUser);
 
       // SI EMAIL YA EXISTE
       if (existingUser) {
+        this.logger.debug('EXISTE USUARIO');
         // SI YA EXISTE, LANZO UN ERROR CONTROLADO
         // ESTO AYUDA A QUE EL FRONTEND PUEDA SABER QUE YA ESTA REGISTRADO  ==> CODIGO 409
-        ErrorManager.createSignatureError(
+        throw ErrorManager.createSignatureError(
           `CONFLICT${ESeparatorsMsgErrors.SEPARATOR}El usuario o email ya está registrado.`,
         );
       }
@@ -72,12 +72,18 @@ export class UserService {
         queryRunner.manager,
       );
 
+      this.logger.debug('LOCATION DATA: ', locationData);
+
       const roleEntity: Role[] = await this.roleService.findOrCreate(
         roleData.role,
         queryRunner.manager,
       );
 
+      this.logger.debug('ROLE DATA: ', roleEntity);
+
       const hashedPassword: string = await hash(password);
+
+      this.logger.debug('HASH PASS: ', hashedPassword);
 
       // CREAR LA ENTIDAD USUARIO
       // AQUI ARMAMOS EL OBJETO USER CON TODOS LOS DATOS DEL FRONTEND
@@ -91,20 +97,16 @@ export class UserService {
         rolesData: roleEntity, // ASIGNO UN ARRAY CON EL ROL
       });
 
+      this.logger.debug('USER CREATE: ', user);
+
       // GUARDAR EL USUARIO EN LA BASE DE DATOS
       // TYPEORM AUTOMATICAMENTE GUARDA LA RELACION EN LA TABLA INTERMEDIA
       const savedUser: User = await queryRunner.manager.save(user);
-
       //PREGUNTO QUE ROL VIENE, PARA SABER SI DEBE CONTINUAR CON MAS DATOS QUE SE AGREGARIAN EN TASKERS Y SUS RELACIONES
       // O SIMPLEMENTE SON LOS DATOS BASICOS DE UN CLIENTE
       let tasker: Tasker | null = null;
       if (roleData.role === 'tasker' && taskerData) {
-        tasker = await this.taskerService.create(
-          fileProfile,
-          filesExp,
-          taskerData,
-          queryRunner.manager,
-        );
+        tasker = await this.taskerService.create(taskerData, queryRunner.manager);
 
         savedUser.taskerData = tasker; // ASIGNAR EL TASKER COMPLETO A LA RLACION
 
@@ -114,10 +116,10 @@ export class UserService {
 
       // SI E ROL ES TASKER PERO NO VIENEN DATOS NO CONTINUAR
       if (roleData.role === 'tasker' && !taskerData) {
-        ErrorManager.createSignatureError(
+        await queryRunner.rollbackTransaction(); // ROLLBACK: SI ALGO FALLA DESHACE  ==> User y Tasker.
+        throw ErrorManager.createSignatureError(
           `INTERNAL_SERVER_ERROR${ESeparatorsMsgErrors.SEPARATOR}El usuario fue registrado con rol "tasker" pero la entidad Tasker no se asoció correctamente.`,
         );
-        await queryRunner.rollbackTransaction(); // ROLLBACK: SI ALGO FALLA DESHACE  ==> User y Tasker.
       }
 
       await queryRunner.commitTransaction(); // COMMIT ==> SI TODO FUNCIONO GUARDAR.
@@ -137,10 +139,6 @@ export class UserService {
     } finally {
       await queryRunner.release(); // CIERRA EL => QueryRunner
     }
-  }
-
-  findAll() {
-    return `This action returns all user`;
   }
 
   // BUSCAR SOLO EL EMAIL EN LA TABLA USERS SIN CRITERIOS DE ACTIVO O NO
@@ -193,7 +191,7 @@ export class UserService {
     }
   }
 
-  // BUSCAR SOLO EL USUARIO EN LA TABLA DE USUARIOS ACTIVOS
+  //MOSTAR USUARIOS QUE ESTEN ACTIVOS POR NOMBRE DE USUARIO
   async findByUserNameActiveForAuth({ userName }: { userName: string }): Promise<User | null> {
     try {
       // CONSULTA
@@ -220,10 +218,95 @@ export class UserService {
     }
   }
 
-  //LEER DATOS DEL USUARIO PARA CARGAR DATOS LUEGO DEL LOGIN
+  // //LEER DATOS DEL USUARIO QUE HACE LOGIN
+  // async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
+  //   try {
+  //     const userId: string = payload.sub;
+
+  //     this.logger.debug(userId);
+
+  //     const user: User | null = await this.userRepository.findOne({
+  //       where: { idUser: userId, active: true },
+  //       relations: [
+  //         'rolesData',
+  //         'locationData',
+  //         'taskerData',
+  //         'taskerData.servicesData',
+  //         'taskerData.workAreasData',
+  //         'taskerData.imageExperience', //BUSCAR EXPLICITAMENTE ES "CARGA PEREZOSA" UNO A MUCHO O MUCHOS A MUCHOS
+  //         'taskerData.daysData',
+  //         'taskerData.hoursData',
+  //         'taskerData.categoryData',
+  //         'taskerData.budgetData',
+  //       ],
+  //     });
+
+  //     // NOTA: EN PERFIL NO, UNO A UNO O MUCHOS A UNO "CARGA ANCIOSA"
+
+  //     this.logger.debug(user);
+
+  //     if (!user) return null;
+
+  //     const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
+
+  //     this.logger.debug(isTasker);
+
+  //     // RETORNAR
+  //     const dataUser: TDataPayloadUser = {
+  //       sub: user.idUser,
+  //       userName: user.userName,
+  //       email: user.email,
+  //       fullName: user.fullName,
+  //       roles: user.rolesData?.map(r => ({
+  //         idRole: r.idRole,
+  //         nameRole: r.nameRole,
+  //       })),
+
+  //       isTasker, //SI ES TASKER
+  //       days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
+  //       hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
+  //       services: isTasker
+  //         ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
+  //         : [],
+  //       worksArea: isTasker
+  //         ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
+  //         : [],
+  //       category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
+  //       budget: isTasker ? user.taskerData?.budgetData || null : null,
+  //       description: isTasker ? user.taskerData?.description || '' : '',
+
+  //       publicIdProfile: isTasker ? user.taskerData.imageProfile.publicId : '',
+  //       publicIdExperiences: isTasker ? user.taskerData.imageExperience.map(img => img.publicId) : [],
+
+  //       idProfile: isTasker ? user?.taskerData?.imageProfile?.idProfile : '',
+  //       idExperiences: isTasker ? user.taskerData.imageExperience.map(img => img.idExperience) : [],
+
+  //       profileImageUrl: isTasker
+  //         ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
+  //         : null,
+  //       experienceImagesUrl: user.taskerData?.imageExperience
+  //         ? user.taskerData.imageExperience.map(
+  //             img => `api/v1/tasker/experience/${img.publicId}/image`,
+  //           )
+  //         : [],
+  //     };
+
+  //     this.logger.debug(dataUser);
+
+  //     return dataUser;
+  //   } catch (error) {
+  //     const err = error as HttpException;
+  //     this.logger.error(err.message, err.stack);
+  //     if (err instanceof ErrorManager) throw err;
+  //     throw ErrorManager.createSignatureError(err.message);
+  //   }
+  // }
+
+  // LEER DATOS DEL USUARIO QUE HACE LOGIN
   async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
     try {
       const userId: string = payload.sub;
+      this.logger.debug(userId);
 
       const user: User | null = await this.userRepository.findOne({
         where: { idUser: userId, active: true },
@@ -233,20 +316,202 @@ export class UserService {
           'taskerData',
           'taskerData.servicesData',
           'taskerData.workAreasData',
+          'taskerData.imageExperience',
+          'taskerData.imageProfile',
           'taskerData.daysData',
           'taskerData.hoursData',
           'taskerData.categoryData',
           'taskerData.budgetData',
-          'taskerData.imageExperience'
         ],
       });
 
+      this.logger.debug(user);
       if (!user) return null;
 
       const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
+      this.logger.debug(isTasker);
+
+      const dataUser: TDataPayloadUser = {
+        sub: user.idUser,
+        userName: user.userName,
+        email: user.email,
+        fullName: user.fullName,
+
+        roles: user.rolesData?.map(r => ({
+          idRole: r.idRole,
+          nameRole: r.nameRole,
+        })),
+
+        isTasker,
+
+        days: isTasker ? (user.taskerData?.daysData?.map(d => d.dayName ?? '') ?? []) : [],
+
+        hours: isTasker ? (user.taskerData?.hoursData?.map(h => h.hourName ?? '') ?? []) : [],
+
+        services: isTasker
+          ? (user.taskerData?.servicesData?.map(s => s.serviceName ?? '') ?? [])
+          : [],
+
+        worksArea: isTasker
+          ? (user.taskerData?.workAreasData?.map(w => w.workAreaName ?? '') ?? [])
+          : [],
+
+        category: isTasker ? (user.taskerData?.categoryData?.categoryName ?? '') : '',
+
+        budget: isTasker ? (user.taskerData?.budgetData ?? null) : null,
+
+        description: isTasker ? (user.taskerData?.description ?? '') : '',
+
+        publicIdProfile: isTasker ? (user.taskerData?.imageProfile?.publicId ?? '') : '',
+
+        publicIdExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.publicId) ?? [])
+          : [],
+
+        idProfile: isTasker ? (user.taskerData?.imageProfile?.idProfile ?? '') : '',
+
+        idExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.idExperience) ?? [])
+          : [],
+
+        profileImageUrl:
+          isTasker && user.taskerData?.idTasker
+            ? `api/v1/tasker/profile/${user.taskerData.idTasker}/image`
+            : null,
+
+        experienceImagesUrl: user.taskerData?.imageExperience
+          ? user.taskerData.imageExperience.map(
+              img => `api/v1/tasker/experience/${img.publicId}/image`,
+            )
+          : [],
+      };
+
+      this.logger.debug(dataUser);
+      return dataUser;
+    } catch (error) {
+      const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
+  }
+
+  // LEER USUARIOS TASKERS ACTIVOS
+  async getAllActiveUsersTaskerProfile(sub: string): Promise<TActiveTaskerUser[]> {
+    try {
+      const users = await this.userRepository.find({
+        where: {
+          idUser: Not(sub),
+          active: true,
+          taskerData: Not(IsNull()),
+        },
+        relations: [
+          'rolesData',
+          'taskerData',
+          'taskerData.budgetData',
+          'taskerData.servicesData',
+          'taskerData.workAreasData',
+          'taskerData.daysData',
+          'taskerData.hoursData',
+          'taskerData.categoryData',
+        ],
+      });
+
+      this.logger.debug(users);
+
+      // USUARIOS ACTIVOS CON ROL TASKER
+      const allDataUsers: TActiveTaskerUser[] = users.map(u => {
+        // DEFINIR ANTES PARA EVITAR PROBLEMAS DE TIPOS EN OBJETO A RETORNAR
+        const sectionBudget: TBudgetData = {
+          idBudget: u.taskerData.budgetData?.idBudget ?? null,
+          amount: u.taskerData.budgetData?.amount ?? 0,
+          budgeSelected: u.taskerData.budgetData?.budgeSelected ?? 'no',
+          reinsertSelected: u.taskerData.budgetData?.reinsertSelected ?? 'no',
+        };
+
+        return {
+          idUser: u.idUser,
+          fullName: u.fullName,
+          userName: u.userName,
+          roles: u.rolesData?.map(r => ({
+            idRole: r.idRole,
+            nameRole: r.nameRole,
+          })),
+
+          tasker: {
+            idTasker: u.taskerData?.idTasker,
+            description: u.taskerData?.description,
+            idCategory: u.taskerData?.idCategory,
+          },
+
+          budget: sectionBudget ?? null,
+          days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
+          hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
+          services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
+          worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
+          category: u.taskerData?.categoryData?.categoryName || '',
+
+          profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
+        } as TActiveTaskerUser;
+      });
+      this.logger.debug(allDataUsers);
+
+      return allDataUsers;
+    } catch (error) {
+      const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
+      if (err instanceof ErrorManager) throw err;
+      throw ErrorManager.createSignatureError(err.message);
+    }
+  }
+
+  //LEER DATOS DE UN USUARIO TASKER CONCRETO
+  async getTaskerSingle(idTasker: string): Promise<TDataPayloadTaskerSingle | null> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: {
+          taskerData: { idTasker: Equal(idTasker) }, //COMPARA ESTRICAMENTE EL VALOR
+          active: true,
+        },
+        relations: [
+          'rolesData',
+          'locationData',
+          'taskerData',
+          'taskerData.servicesData',
+          'taskerData.workAreasData',
+          'taskerData.imageExperience',
+          'taskerData.imageProfile',
+          'taskerData.budgetData',
+          'taskerData.daysData',
+          'taskerData.hoursData',
+          'taskerData.categoryData',
+        ],
+      });
+
+      // SI NO EXISTE UUSUARIO
+      if (!user) {
+        throw ErrorManager.createSignatureError(
+          `NOT_FOUND${ESeparatorsMsgErrors.SEPARATOR}Tasker con ID ${idTasker} no encontrado.`,
+        );
+      }
+
+      const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
+      const isRepair: boolean =
+        user.taskerData.categoryData.categoryName === 'reparacion-mantenimiento';
+      const isWorkAreas: boolean = user.taskerData.workAreasData.length > 0; //SI VIENEN DATOS DE HABITOS
+
+      this.logger.debug(isTasker);
+
+      // DEFINIR ANTES PARA EVITAR PROBLEMAS DE TIPOS EN OBJETO A RETORNAR
+      const sectionBudget: TBudgetData = {
+        idBudget: user.taskerData.budgetData?.idBudget ?? null,
+        amount: user.taskerData.budgetData?.amount ?? 0,
+        budgeSelected: user.taskerData.budgetData?.budgeSelected ?? 'no',
+        reinsertSelected: user.taskerData.budgetData?.reinsertSelected ?? 'no',
+      };
 
       // RETORNAR
-      return {
+      const dataUser: TDataPayloadTaskerSingle = {
         sub: user.idUser,
         userName: user.userName,
         email: user.email,
@@ -255,73 +520,58 @@ export class UserService {
           idRole: r.idRole,
           nameRole: r.nameRole,
         })),
-
+        isWorkAreas,
+        isRepair, //SI ES CATEGORIA REPARACIONES
         isTasker, //SI ES TASKER
-        // SOLO SI ES TASKER, con arrays vacíos si no hay datos
+        taskerId: user.taskerData.idTasker,
         days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
         hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
-        services: isTasker ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || [] : [],
-        worksArea: isTasker ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [] : [],
-        category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
-        budget: isTasker ? user.taskerData?.budgetData || null : null,
-        description: isTasker ? user.taskerData?.description || '' : '',
-        profileImageUrl: isTasker ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image` : null,
-        experienceImagesUrl: user.taskerData?.imageExperience ? user.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
+        services: isTasker
+          ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
           : [],
-      }
+        worksArea: isTasker
+          ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
+          : [],
+        category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
+        budget: sectionBudget ?? null,
+        description: isTasker ? user.taskerData?.description || '' : '',
 
+        publicIdProfile: isTasker ? (user.taskerData?.imageProfile?.publicId ?? '') : '',
+
+        idProfile: isTasker ? (user.taskerData?.imageProfile?.idProfile ?? '') : '',
+
+        publicIdExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.publicId) ?? [])
+          : [],
+
+        idExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.idExperience) ?? [])
+          : [],
+
+        profileImageUrl: isTasker
+          ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
+          : null,
+        experienceImagesUrl: user.taskerData?.imageExperience
+          ? user.taskerData.imageExperience.map(
+              img => `api/v1/tasker/experience/${img.publicId}/image`,
+            )
+          : [],
+        city: user.locationData.cityName,
+      };
+
+      this.logger.debug(dataUser);
+
+      return dataUser;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
   }
 
-  // LEER USUARIOS TASKERS ACTIVOS
-  async getActiveUsersTasker(sub: string): Promise<TActiveTaskerUser[]> {
-    const users = await this.userRepository.find({
-      where: {
-        idUser: Not(sub),
-        active: true,
-        taskerData: Not(IsNull()),
-      },
-      relations: ['rolesData', 'taskerData', 'taskerData.imageExperience', 'taskerData.servicesData', 'taskerData.workAreasData', 'taskerData.daysData', 'taskerData.hoursData', 'taskerData.categoryData'],
-    });
-
-    return users.map(u => ({
-      idUser: u.idUser,
-      fullName: u.fullName,
-      userName: u.userName,
-
-      roles: u.rolesData?.map(r => ({
-        idRole: r.idRole,
-        nameRole: r.nameRole,
-      })),
-
-      tasker: {
-        idTasker: u.taskerData?.idTasker,
-        description: u.taskerData?.description,
-        idCategory: u.taskerData?.idCategory,
-      },
-
-      days: u.taskerData?.daysData?.map(d => d.dayName || '') || [],
-      hours: u.taskerData?.hoursData?.map(h => h.hourName || '') || [],
-      services: u.taskerData?.servicesData?.map(s => s.serviceName || '') || [],
-      worksArea: u.taskerData?.workAreasData?.map(w => w.workAreaName || '') || [],
-      category: u.taskerData?.categoryData?.categoryName || '',
-
-      profileImageUrl: `api/v1/tasker/profile/${u.taskerData?.idTasker}/image`,
-      experienceImagesUrl: u.taskerData?.imageExperience ? u.taskerData.imageExperience.map(img => `api/v1/tasker/experience/${img.idExperience}/image`)
-        : [],
-    })) as TActiveTaskerUser[];
-  }
-
   async findOne(id: number) {
     return `This action returns a #${id} user`;
-  }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
   }
 
   remove(id: number) {

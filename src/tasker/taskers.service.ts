@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { CreateTaskerDto } from './dto/create-tasker.dto';
 import { UpdateTaskerDto } from './dto/update-tasker.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,12 +22,13 @@ import { ExperiencesService } from 'src/experiences/experiences.service';
 import { Profile } from 'src/profile/entities/profile.entity';
 import { Experience } from 'src/experiences/entities/experience.entity';
 import { instanceToPlain } from 'class-transformer';
-import { TaskerResponse } from './dto/response-tasker.dto';
+// import { TaskerResponse } from './dto/response-tasker.dto';
 import { ECategory } from 'src/common/enums/enumCategory';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
 
 @Injectable()
 export class TaskersService {
+  private readonly logger: Logger = new Logger(TaskersService.name);
   constructor(
     @InjectRepository(Tasker) private readonly taskerRepo: Repository<Tasker>,
     private readonly categoryService: CategoryService,
@@ -40,30 +41,38 @@ export class TaskersService {
     private readonly imageExpService: ExperiencesService,
   ) {}
 
-
   // CREAR UN TASKER
-  async create(
-    fileProfile: Express.Multer.File | null,
-    filesExp: Express.Multer.File[],
-    createTaskerDto: CreateTaskerDto,
-    mannager: EntityManager, //ADMINISTRADOR DE TRANSACCION DE typeorm
-  ): Promise<Tasker> {
-    const { categoryData, dayData, hourData, workAreaData, serviceData, description, budgetData } =
-      createTaskerDto;
+  async create(createTaskerDto: CreateTaskerDto, mannager: EntityManager): Promise<Tasker> {
+    const {
+      categoryData,
+      dayData,
+      hourData,
+      workAreaData,
+      serviceData,
+      description,
+      budgetData,
+      imageProfileData,
+      imageExperienceData,
+    } = createTaskerDto;
     try {
       // OBTENER EL ROPISITORIO TRANSACCIONAL ==> NECESARIO PARA EL CREATE
       const taskerRepository: Repository<Tasker> = mannager.getRepository(Tasker);
 
+      this.logger.debug(taskerRepository);
       const categoryEntity: Category = await this.categoryService.findOrCreate(
         categoryData,
         mannager,
       );
+
+      this.logger.debug(categoryEntity);
 
       //------------------------------HABITOS------------------------------//
       const workAreaEntity: WorkArea[] = await this.workAreaService.findeOrCreate(
         workAreaData.workArea,
         mannager,
       );
+
+      this.logger.debug(workAreaData);
 
       //------------------------------SERVICIOS------------------------------//
       const serviceEntity: Service[] = await this.serviceService.findeOrCreate(
@@ -72,14 +81,22 @@ export class TaskersService {
         mannager,
       );
 
+      this.logger.debug(serviceEntity);
+
       //------------------------------DIAS------------------------------//
       const dayEntity: Day[] = await this.dayService.findeOrCreate(dayData.day, mannager);
 
+      this.logger.debug(dayEntity);
       //------------------------------HORARIOS------------------------------//
       const hourEntity: Hour[] = await this.hourService.findeOrCreate(hourData.hour, mannager);
 
+      this.logger.debug(hourEntity);
       // -------------SECCION DE DATOS PRESUPUESTO-------------------//
       let budgetEntity: Budget | null = null;
+
+      let profileEntity: Profile | null = null;
+      let experienceEntity: Experience[] = [];
+
       // PREGUNTO SI VIENEN DATOS EN DTO ANTES DE PROCESAR A AGREGAR EN PRESUPUESTO
       if (budgetData) {
         budgetEntity = await this.budgetService.create(
@@ -88,6 +105,8 @@ export class TaskersService {
           mannager,
         );
       }
+
+      this.logger.debug(budgetEntity);
 
       // OBJETO DE DATOS QUE SE AGREGAN AL TASKER
       const newDataTasker: Tasker = taskerRepository.create({
@@ -102,27 +121,39 @@ export class TaskersService {
         idCategory: categoryEntity.idCategory,
       });
 
-      // ALMACENAR DATOS
+      this.logger.debug(newDataTasker);
+
+      // ALMACENAR DATOS DE TASKER ANTES DE PASAR EL ID AL LAS ENTIDADES DE IMAGENES
       const savedDataTasker: Tasker = await taskerRepository.save(newDataTasker);
 
-      // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGEN DEL PERFIL
-      const imageProfile: Profile | null =
-        (await this.imageProfileService.create(fileProfile, savedDataTasker.idTasker, mannager)) ??
-        null;
 
-      // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGENES DEL EXPERIENCIAS
-      const imagesExperiences: Experience[] =
-        (await this.imageExpService.create(filesExp, savedDataTasker.idTasker, mannager)) ?? [];
 
-      const taskerPlain = instanceToPlain(savedDataTasker) as Tasker;
+      // SI VIENEN IMAGEN DE PERFIL
+       if (imageProfileData) {
+        // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGEN DEL PERFIL
+        profileEntity = (await this.imageProfileService.create(savedDataTasker.idTasker, imageProfileData, mannager)) ?? null;
+      }
 
-      return {
-        ...taskerPlain,
-        profileImage: this.imageProfileService.mapProfileImage(imageProfile),
-        experiencesImages: this.imageExpService.mapExperienceImages(imagesExperiences),
-      } as TaskerResponse;
+      this.logger.debug('ENTIDAD DE PERFIL DE TASKER: ', profileEntity);
+
+      // SI VIENEN IMAGENES DE EXPERIENCIAS DEL TASKER
+      if (imageExperienceData.length > 0) {
+        experienceEntity =
+          (await this.imageExpService.create(
+            savedDataTasker.idTasker,
+            imageExperienceData,
+            mannager,
+          )) ?? [];
+      }
+
+      this.logger.debug('ENTIDADES DE PERFIL DE TASKER: ', experienceEntity);
+
+      this.logger.debug('SALVAR DATOS DE TASKER', savedDataTasker);
+
+      return savedDataTasker;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       // SI EL ERROR YA FUE MANEJADO POR ERRORMANAGER, LO RELANZO TAL CUAL
       if (err instanceof ErrorManager) throw err;
       // SI NO, CREO UN ERROR 500 GENÉRICO CON FIRMA DE ERROR
@@ -133,11 +164,6 @@ export class TaskersService {
   // LEER IMAGEN DE TASKER
   async getProfileImage(idTasker: string): Promise<TTaskerImage | null> {
     return this.imageProfileService.getProfileByTasker(idTasker);
-  }
-
-  // LEER TODAS SUS IMAGENES DE EXPERIENCIAS
-  async getExperienceImages(idTasker: string): Promise<TTaskerImage[]> {
-    return this.imageExpService.getExperiencesByTasker(idTasker);
   }
 
   // DELEGO METODO DE SERVICIO IMAGENES EXPERIENCIAS

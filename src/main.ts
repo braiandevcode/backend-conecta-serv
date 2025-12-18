@@ -6,14 +6,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: [`${process.env.FE_HOST}`], // FRONTEND
+    origin: [`${process.env.FE_HOST}`, '*'], // FRONTEND
     credentials: true, // SI SE USA COOKIES / HEADERS
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Authorization'],
   });
-
+ 
   // ES UN MIDDLEWARE DE COOKIES
   app.use(cookieParser());
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
 }
 bootstrap();

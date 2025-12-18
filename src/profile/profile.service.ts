@@ -1,36 +1,23 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
 import { Profile } from './entities/profile.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
-import { randomUUID } from 'crypto';
-import path from 'path'; //MODULO DE NODE
-import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
+import { CreateProfileDto } from './dto/create-profile.dto';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Injectable()
 export class ProfileService {
-  constructor(@InjectRepository(Profile) private readonly imageProfileRepo: Repository<Profile>) {}
-
-  // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE PERFIL
-  public mapProfileImage = (profile: Profile | null): ImageMetadataDto | null => {
-    if (!profile) return null;
-    return {
-      idImage: profile.idProfile,
-      systemFileName: profile.systemFileName,
-      mimeType: profile.mimeType,
-      originalName: profile.originalName,
-      size: profile.size,
-      createAt: profile.createdAt,
-      updateAt: profile.updatedAt,
-      deleteAt: profile.deletedAt,
-      idTasker: profile.tasker.idTasker,
-    } as ImageMetadataDto;
-  };
-
+  private readonly logger: Logger = new Logger(ProfileService.name);
+  constructor(
+    @InjectRepository(Profile) private readonly imageProfileRepo: Repository<Profile>,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
+  // CREAR NUEVA IMAGEN DEL PERFIL DE UN TASKER
   async create(
-    file: Express.Multer.File | null,
     idTasker: string,
+    imageDto: CreateProfileDto,
     manager?: EntityManager,
   ): Promise<Profile | null> {
     try {
@@ -39,25 +26,19 @@ export class ProfileService {
         ? manager.getRepository(Profile)
         : this.imageProfileRepo;
 
-      if (!file) return null;
+      const newImageProfile: Profile = repo.create({ ...imageDto, tasker: { idTasker } });
 
-      const extension = path.extname(file.originalname);
-      const systemFileName: string = `${randomUUID()}${extension}`;
-
-      const newImageProfile: Profile = repo.create({
-        size: file.size,
-        mimeType: file.mimetype,
-        originalName: file.originalname,
-        imageBase64: file.buffer,
-        systemFileName,
-        tasker: { idTasker },
-      });
+      this.logger.debug('NUEVA IMAGEN DE PERFIL: ', newImageProfile);
 
       const savedImageProfile: Profile = await repo.save(newImageProfile);
+
+      this.logger.debug('NUEVALO QUE SE ESTA RETORNANDO: ', newImageProfile);
 
       return savedImageProfile; //RETORNAR ENTIDAD GUARDADA
     } catch (error) {
       const err = error as HttpException;
+
+      this.logger.error(err.name, err.stack);
       // SI EL ERROR YA FUE MANEJADO POR ERRORMANAGER, LO RELANZO TAL CUAL
       if (err instanceof ErrorManager) throw err;
 
@@ -67,20 +48,25 @@ export class ProfileService {
   }
 
   // BUSCAR IMAGEN POR ID
-  async findOne(idTasker: string): Promise<{ mimeType: string; base64: string } | null> {
+  async findOneImageProfile(idTasker: string): Promise<TTaskerImage | null> {
     try {
       const imageProfile: Profile | null = await this.imageProfileRepo.findOne({
         where: { tasker: { idTasker } },
       });
 
+      this.logger.debug(imageProfile);
+
       if (!imageProfile) return null;
 
+      // RETORNO DATOS NECESARIOS AL FRONTEND
       return {
-        mimeType: imageProfile.mimeType,
-        base64: imageProfile.imageBase64.toString('base64'),
-      };
+        publicId: imageProfile.publicId,
+        mimeType: imageProfile.type,
+        url: imageProfile.secureUrl,
+      } as TTaskerImage;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
@@ -89,23 +75,33 @@ export class ProfileService {
   // LEER LA IMAGEN DEL PERFIL DEL TASKER
   async getProfileByTasker(idTasker: string): Promise<TTaskerImage | null> {
     try {
-      const imageProfile: Profile  | null = await this.imageProfileRepo.findOne({
+      const imageProfile: Profile | null = await this.imageProfileRepo.findOne({
         where: { tasker: { idTasker } },
       });
 
-      if(!imageProfile) return null;
+      this.logger.debug(imageProfile);
 
-       return {
-        base64: imageProfile.imageBase64,
-        id: imageProfile.idProfile,
-        mimeType: imageProfile.mimeType,
-        originalName: imageProfile.originalName,
-        systemFileName: imageProfile.systemFileName,
-      } as TTaskerImage;
+      if (!imageProfile) return null;
+
+      const imageProfileTasker: TTaskerImage = {
+        publicId: imageProfile.publicId,
+        mimeType: imageProfile.type,
+        url: imageProfile.secureUrl,
+      };
+
+      this.logger.debug(imageProfileTasker);
+
+      return imageProfileTasker;
     } catch (error) {
       const err = error as HttpException;
+      this.logger.error(err.message, err.stack);
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
+  }
+
+  // BORRAR SOLO IMAGEN PREVIA ANTES DE REGISTRO
+  async deleteAvatarPrev(publicId: string): Promise<void> {
+    return await this.cloudinaryService.delete(publicId);
   }
 }
