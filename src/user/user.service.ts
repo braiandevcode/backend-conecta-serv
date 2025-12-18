@@ -36,11 +36,7 @@ export class UserService {
   ) {}
 
   // CREAR DATOS BASICOS DE USUARIO (DEFAULT ROL CLIENTE)
-  async create(
-    fileProfile: Express.Multer.File | null,
-    filesExp: Express.Multer.File[],
-    createUserDto: CreateUserDto,
-  ): Promise<Record<string, Omit<User, 'password'>>> {
+  async create(createUserDto: CreateUserDto): Promise<Record<string, Omit<User, 'password'>>> {
     // DESESTRUCTURO LOS DATOS QUE LLEGAN DEL FRONTEND
     const { email, userName, locationData, roleData, taskerData, password, ...restOfUserDto } =
       createUserDto;
@@ -58,12 +54,14 @@ export class UserService {
           { userName: userName }, // O EXISTE UN USUARIO CON ESTE USERNAME
         ],
       });
+      this.logger.debug('EXISTE USUARIO: ', existingUser);
 
       // SI EMAIL YA EXISTE
       if (existingUser) {
+        this.logger.debug('EXISTE USUARIO');
         // SI YA EXISTE, LANZO UN ERROR CONTROLADO
         // ESTO AYUDA A QUE EL FRONTEND PUEDA SABER QUE YA ESTA REGISTRADO  ==> CODIGO 409
-        ErrorManager.createSignatureError(
+        throw ErrorManager.createSignatureError(
           `CONFLICT${ESeparatorsMsgErrors.SEPARATOR}El usuario o email ya está registrado.`,
         );
       }
@@ -74,12 +72,18 @@ export class UserService {
         queryRunner.manager,
       );
 
+      this.logger.debug('LOCATION DATA: ', locationData);
+
       const roleEntity: Role[] = await this.roleService.findOrCreate(
         roleData.role,
         queryRunner.manager,
       );
 
+      this.logger.debug('ROLE DATA: ', roleEntity);
+
       const hashedPassword: string = await hash(password);
+
+      this.logger.debug('HASH PASS: ', hashedPassword);
 
       // CREAR LA ENTIDAD USUARIO
       // AQUI ARMAMOS EL OBJETO USER CON TODOS LOS DATOS DEL FRONTEND
@@ -93,20 +97,16 @@ export class UserService {
         rolesData: roleEntity, // ASIGNO UN ARRAY CON EL ROL
       });
 
+      this.logger.debug('USER CREATE: ', user);
+
       // GUARDAR EL USUARIO EN LA BASE DE DATOS
       // TYPEORM AUTOMATICAMENTE GUARDA LA RELACION EN LA TABLA INTERMEDIA
       const savedUser: User = await queryRunner.manager.save(user);
-
       //PREGUNTO QUE ROL VIENE, PARA SABER SI DEBE CONTINUAR CON MAS DATOS QUE SE AGREGARIAN EN TASKERS Y SUS RELACIONES
       // O SIMPLEMENTE SON LOS DATOS BASICOS DE UN CLIENTE
       let tasker: Tasker | null = null;
       if (roleData.role === 'tasker' && taskerData) {
-        tasker = await this.taskerService.create(
-          fileProfile,
-          filesExp,
-          taskerData,
-          queryRunner.manager,
-        );
+        tasker = await this.taskerService.create(taskerData, queryRunner.manager);
 
         savedUser.taskerData = tasker; // ASIGNAR EL TASKER COMPLETO A LA RLACION
 
@@ -116,10 +116,10 @@ export class UserService {
 
       // SI E ROL ES TASKER PERO NO VIENEN DATOS NO CONTINUAR
       if (roleData.role === 'tasker' && !taskerData) {
-        ErrorManager.createSignatureError(
+        await queryRunner.rollbackTransaction(); // ROLLBACK: SI ALGO FALLA DESHACE  ==> User y Tasker.
+        throw ErrorManager.createSignatureError(
           `INTERNAL_SERVER_ERROR${ESeparatorsMsgErrors.SEPARATOR}El usuario fue registrado con rol "tasker" pero la entidad Tasker no se asoció correctamente.`,
         );
-        await queryRunner.rollbackTransaction(); // ROLLBACK: SI ALGO FALLA DESHACE  ==> User y Tasker.
       }
 
       await queryRunner.commitTransaction(); // COMMIT ==> SI TODO FUNCIONO GUARDAR.
@@ -218,11 +218,94 @@ export class UserService {
     }
   }
 
-  //LEER DATOS DEL USUARIO QUE HACE LOGIN
+  // //LEER DATOS DEL USUARIO QUE HACE LOGIN
+  // async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
+  //   try {
+  //     const userId: string = payload.sub;
+
+  //     this.logger.debug(userId);
+
+  //     const user: User | null = await this.userRepository.findOne({
+  //       where: { idUser: userId, active: true },
+  //       relations: [
+  //         'rolesData',
+  //         'locationData',
+  //         'taskerData',
+  //         'taskerData.servicesData',
+  //         'taskerData.workAreasData',
+  //         'taskerData.imageExperience', //BUSCAR EXPLICITAMENTE ES "CARGA PEREZOSA" UNO A MUCHO O MUCHOS A MUCHOS
+  //         'taskerData.daysData',
+  //         'taskerData.hoursData',
+  //         'taskerData.categoryData',
+  //         'taskerData.budgetData',
+  //       ],
+  //     });
+
+  //     // NOTA: EN PERFIL NO, UNO A UNO O MUCHOS A UNO "CARGA ANCIOSA"
+
+  //     this.logger.debug(user);
+
+  //     if (!user) return null;
+
+  //     const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
+
+  //     this.logger.debug(isTasker);
+
+  //     // RETORNAR
+  //     const dataUser: TDataPayloadUser = {
+  //       sub: user.idUser,
+  //       userName: user.userName,
+  //       email: user.email,
+  //       fullName: user.fullName,
+  //       roles: user.rolesData?.map(r => ({
+  //         idRole: r.idRole,
+  //         nameRole: r.nameRole,
+  //       })),
+
+  //       isTasker, //SI ES TASKER
+  //       days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
+  //       hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
+  //       services: isTasker
+  //         ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
+  //         : [],
+  //       worksArea: isTasker
+  //         ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
+  //         : [],
+  //       category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
+  //       budget: isTasker ? user.taskerData?.budgetData || null : null,
+  //       description: isTasker ? user.taskerData?.description || '' : '',
+
+  //       publicIdProfile: isTasker ? user.taskerData.imageProfile.publicId : '',
+  //       publicIdExperiences: isTasker ? user.taskerData.imageExperience.map(img => img.publicId) : [],
+
+  //       idProfile: isTasker ? user?.taskerData?.imageProfile?.idProfile : '',
+  //       idExperiences: isTasker ? user.taskerData.imageExperience.map(img => img.idExperience) : [],
+
+  //       profileImageUrl: isTasker
+  //         ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
+  //         : null,
+  //       experienceImagesUrl: user.taskerData?.imageExperience
+  //         ? user.taskerData.imageExperience.map(
+  //             img => `api/v1/tasker/experience/${img.publicId}/image`,
+  //           )
+  //         : [],
+  //     };
+
+  //     this.logger.debug(dataUser);
+
+  //     return dataUser;
+  //   } catch (error) {
+  //     const err = error as HttpException;
+  //     this.logger.error(err.message, err.stack);
+  //     if (err instanceof ErrorManager) throw err;
+  //     throw ErrorManager.createSignatureError(err.message);
+  //   }
+  // }
+
+  // LEER DATOS DEL USUARIO QUE HACE LOGIN
   async getUserData(payload: iJwtPayload): Promise<TDataPayloadUser | null> {
     try {
       const userId: string = payload.sub;
-
       this.logger.debug(userId);
 
       const user: User | null = await this.userRepository.findOne({
@@ -233,7 +316,8 @@ export class UserService {
           'taskerData',
           'taskerData.servicesData',
           'taskerData.workAreasData',
-          'taskerData.imageExperience', //BUSCAR EXPLICITAMENTE ES "CARGA PEREZOSA" UNO A MUCHO O MUCHOS A MUCHOS
+          'taskerData.imageExperience',
+          'taskerData.imageProfile',
           'taskerData.daysData',
           'taskerData.hoursData',
           'taskerData.categoryData',
@@ -241,51 +325,68 @@ export class UserService {
         ],
       });
 
-      // NOTA: EN PERFIL NO, UNO A UNO O MUCHOS A UNO "CARGA ANCIOSA"
-
       this.logger.debug(user);
-
       if (!user) return null;
 
       const isTasker: boolean = user.rolesData.some(r => r.nameRole === 'tasker');
-
       this.logger.debug(isTasker);
 
-      // RETORNAR
       const dataUser: TDataPayloadUser = {
         sub: user.idUser,
         userName: user.userName,
         email: user.email,
         fullName: user.fullName,
+
         roles: user.rolesData?.map(r => ({
           idRole: r.idRole,
           nameRole: r.nameRole,
         })),
 
-        isTasker, //SI ES TASKER
-        days: isTasker ? user.taskerData?.daysData?.map(d => d.dayName || '') || [] : [],
-        hours: isTasker ? user.taskerData?.hoursData?.map(h => h.hourName || '') || [] : [],
+        isTasker,
+
+        days: isTasker ? (user.taskerData?.daysData?.map(d => d.dayName ?? '') ?? []) : [],
+
+        hours: isTasker ? (user.taskerData?.hoursData?.map(h => h.hourName ?? '') ?? []) : [],
+
         services: isTasker
-          ? user.taskerData?.servicesData?.map(s => s.serviceName || '') || []
+          ? (user.taskerData?.servicesData?.map(s => s.serviceName ?? '') ?? [])
           : [],
+
         worksArea: isTasker
-          ? user.taskerData?.workAreasData?.map(w => w.workAreaName || '') || []
+          ? (user.taskerData?.workAreasData?.map(w => w.workAreaName ?? '') ?? [])
           : [],
-        category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
-        budget: isTasker ? user.taskerData?.budgetData || null : null,
-        description: isTasker ? user.taskerData?.description || '' : '',
-        profileImageUrl: isTasker
-          ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
-          : null,
+
+        category: isTasker ? (user.taskerData?.categoryData?.categoryName ?? '') : '',
+
+        budget: isTasker ? (user.taskerData?.budgetData ?? null) : null,
+
+        description: isTasker ? (user.taskerData?.description ?? '') : '',
+
+        publicIdProfile: isTasker ? (user.taskerData?.imageProfile?.publicId ?? '') : '',
+
+        publicIdExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.publicId) ?? [])
+          : [],
+
+        idProfile: isTasker ? (user.taskerData?.imageProfile?.idProfile ?? '') : '',
+
+        idExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.idExperience) ?? [])
+          : [],
+
+        profileImageUrl:
+          isTasker && user.taskerData?.idTasker
+            ? `api/v1/tasker/profile/${user.taskerData.idTasker}/image`
+            : null,
+
         experienceImagesUrl: user.taskerData?.imageExperience
           ? user.taskerData.imageExperience.map(
-              img => `api/v1/tasker/experience/${img.idExperience}/image`,
+              img => `api/v1/tasker/experience/${img.publicId}/image`,
             )
           : [],
       };
 
       this.logger.debug(dataUser);
-
       return dataUser;
     } catch (error) {
       const err = error as HttpException;
@@ -379,6 +480,7 @@ export class UserService {
           'taskerData.servicesData',
           'taskerData.workAreasData',
           'taskerData.imageExperience',
+          'taskerData.imageProfile',
           'taskerData.budgetData',
           'taskerData.daysData',
           'taskerData.hoursData',
@@ -433,12 +535,25 @@ export class UserService {
         category: isTasker ? user.taskerData?.categoryData?.categoryName || '' : '',
         budget: sectionBudget ?? null,
         description: isTasker ? user.taskerData?.description || '' : '',
+
+        publicIdProfile: isTasker ? (user.taskerData?.imageProfile?.publicId ?? '') : '',
+
+        idProfile: isTasker ? (user.taskerData?.imageProfile?.idProfile ?? '') : '',
+
+        publicIdExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.publicId) ?? [])
+          : [],
+
+        idExperiences: isTasker
+          ? (user.taskerData?.imageExperience?.map(img => img.idExperience) ?? [])
+          : [],
+
         profileImageUrl: isTasker
           ? `api/v1/tasker/profile/${user.taskerData?.idTasker}/image`
           : null,
         experienceImagesUrl: user.taskerData?.imageExperience
           ? user.taskerData.imageExperience.map(
-              img => `api/v1/tasker/experience/${img.idExperience}/image`,
+              img => `api/v1/tasker/experience/${img.publicId}/image`,
             )
           : [],
         city: user.locationData.cityName,

@@ -1,7 +1,5 @@
 export interface TTaskerImage {
-  id: string;             // ID DE LA IMAGEN
-  base64: Buffer;         // CONTENIDO BASE 64
-  mimeType: string;       // TIPIPO DE MIME
-  originalName?: string;   
-  systemFileName?: string; 
+  publicId: string;  // ID QUE VIENE DE CLOUDARY
+  url:string, // URL QUE VIENE DE CLOUDARY
+  mimeType: string;// TIPO DE MIME
 }

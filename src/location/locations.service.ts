@@ -26,10 +26,13 @@ export class LocationsService {
       if (!locationEntity) {
         // EL METODO 'CREATE' SOLO CONSTRUYE UNA INSTANCIA DE LA ENTIDAD EN MEMORIA, APLICANDO DEFAULTS Y PREPARANDO VALIDACIONES, SIN INTERACTUAR CON LA BASE DE DATOS.
         locationEntity = repo.create(createLocationDto);
+
+        this.logger.debug('LOCATION: ', locationEntity)
   
         // VALIDAR QUE LA CIUDAD SEA UNA PERMITIDA
         if (!Object.values(ELocations).includes(locationEntity.cityName)) {
-          ErrorManager.createSignatureError(`FORBIDDEN${ESeparatorsMsgErrors.SEPARATOR}La ciudad no es una ubicación permitida. 2`);
+          this.logger.debug('LOCATION ES EL CULPABLE??')
+          throw ErrorManager.createSignatureError(`FORBIDDEN${ESeparatorsMsgErrors.SEPARATOR}La ciudad no es una ubicación permitida.`);
         }
         
         // EL METODO 'SAVE' EJECUTA EL COMANDO SQL 'INSERT' EN LA BASE DE DATOS Y DEVUELVE LA ENTIDAD CON SU NUEVO ID.

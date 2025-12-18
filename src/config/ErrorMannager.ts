@@ -16,6 +16,6 @@ export class ErrorManager extends HttpException {
         ? (HttpStatus[typeName] as number) 
         : HttpStatus.INTERNAL_SERVER_ERROR; 
 
-    throw new HttpException(message, status);
+    return new HttpException(message, status);
   }
 }

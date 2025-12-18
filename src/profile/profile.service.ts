@@ -3,37 +3,21 @@ import { EntityManager, Repository } from 'typeorm';
 import { Profile } from './entities/profile.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ErrorManager } from 'src/config/ErrorMannager';
-import { randomUUID } from 'crypto';
-import path from 'path'; //MODULO DE NODE
-import { ImageMetadataDto } from 'src/shared/dtos/image-dto';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
-import { TDataImageBase64 } from 'src/types/typeDataImageBase64';
+import { CreateProfileDto } from './dto/create-profile.dto';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Injectable()
 export class ProfileService {
   private readonly logger: Logger = new Logger(ProfileService.name);
-  constructor(@InjectRepository(Profile) private readonly imageProfileRepo: Repository<Profile>) {}
-
-  // METODO PARA MAPEAR PROPIEDADES NECESARIAS DE PERFIL
-  public mapProfileImage = (profile: Profile | null): ImageMetadataDto | null => {
-    this.logger.debug(profile);
-    if (!profile) return null;
-    return {
-      idImage: profile.idProfile,
-      systemFileName: profile.systemFileName,
-      mimeType: profile.mimeType,
-      originalName: profile.originalName,
-      size: profile.size,
-      createAt: profile.createdAt,
-      updateAt: profile.updatedAt,
-      deleteAt: profile.deletedAt,
-      idTasker: profile.tasker.idTasker,
-    } as ImageMetadataDto;
-  };
-
+  constructor(
+    @InjectRepository(Profile) private readonly imageProfileRepo: Repository<Profile>,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
+  // CREAR NUEVA IMAGEN DEL PERFIL DE UN TASKER
   async create(
-    file: Express.Multer.File | null,
     idTasker: string,
+    imageDto: CreateProfileDto,
     manager?: EntityManager,
   ): Promise<Profile | null> {
     try {
@@ -42,23 +26,13 @@ export class ProfileService {
         ? manager.getRepository(Profile)
         : this.imageProfileRepo;
 
-      if (!file) return null;
+      const newImageProfile: Profile = repo.create({ ...imageDto, tasker: { idTasker } });
 
-      const extension = path.extname(file.originalname);
-      const systemFileName: string = `${randomUUID()}${extension}`;
-
-      const newImageProfile: Profile = repo.create({
-        size: file.size,
-        mimeType: file.mimetype,
-        originalName: file.originalname,
-        imageBase64: file.buffer,
-        systemFileName,
-        tasker: { idTasker },
-      });
-
-      this.logger.debug(newImageProfile);
+      this.logger.debug('NUEVA IMAGEN DE PERFIL: ', newImageProfile);
 
       const savedImageProfile: Profile = await repo.save(newImageProfile);
+
+      this.logger.debug('NUEVALO QUE SE ESTA RETORNANDO: ', newImageProfile);
 
       return savedImageProfile; //RETORNAR ENTIDAD GUARDADA
     } catch (error) {
@@ -74,7 +48,7 @@ export class ProfileService {
   }
 
   // BUSCAR IMAGEN POR ID
-  async findOneImageBase64(idTasker: string): Promise<TDataImageBase64 | null> {
+  async findOneImageProfile(idTasker: string): Promise<TTaskerImage | null> {
     try {
       const imageProfile: Profile | null = await this.imageProfileRepo.findOne({
         where: { tasker: { idTasker } },
@@ -84,14 +58,12 @@ export class ProfileService {
 
       if (!imageProfile) return null;
 
-      const imageProfileBase64: TDataImageBase64 = {
-        mimeType: imageProfile.mimeType,
-        base64: imageProfile.imageBase64.toString('base64'),
-      };
-
-      this.logger.debug(imageProfileBase64);
-
-      return imageProfileBase64;
+      // RETORNO DATOS NECESARIOS AL FRONTEND
+      return {
+        publicId: imageProfile.publicId,
+        mimeType: imageProfile.type,
+        url: imageProfile.secureUrl,
+      } as TTaskerImage;
     } catch (error) {
       const err = error as HttpException;
       this.logger.error(err.message, err.stack);
@@ -111,13 +83,11 @@ export class ProfileService {
 
       if (!imageProfile) return null;
 
-      const imageProfileTasker = {
-        base64: imageProfile.imageBase64,
-        id: imageProfile.idProfile,
-        mimeType: imageProfile.mimeType,
-        originalName: imageProfile.originalName,
-        systemFileName: imageProfile.systemFileName,
-      } as TTaskerImage;
+      const imageProfileTasker: TTaskerImage = {
+        publicId: imageProfile.publicId,
+        mimeType: imageProfile.type,
+        url: imageProfile.secureUrl,
+      };
 
       this.logger.debug(imageProfileTasker);
 
@@ -128,5 +98,10 @@ export class ProfileService {
       if (err instanceof ErrorManager) throw err;
       throw ErrorManager.createSignatureError(err.message);
     }
+  }
+
+  // BORRAR SOLO IMAGEN PREVIA ANTES DE REGISTRO
+  async deleteAvatarPrev(publicId: string): Promise<void> {
+    return await this.cloudinaryService.delete(publicId);
   }
 }
