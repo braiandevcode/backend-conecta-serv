@@ -1,5 +1,5 @@
 import { ONE_WEEK_IN_MS } from './timeExpiration';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CookieOptions } from 'express';
 
 // INVESTIGADO EN : https://www.npmjs.com/package/cookie
