@@ -38,7 +38,7 @@ export class CategoryService {
 
         // VALIDAR QUE LA CATEGORIA SEA UNA PERMITIDA
         if (!(categoryName in SERVICES_BY_CATEGORY)) {
-          ErrorManager.createSignatureError(`FORBIDDEN${ESeparatorsMsgErrors.SEPARATOR}La categoria establecida no es valida.`);
+          throw ErrorManager.createSignatureError(`FORBIDDEN${ESeparatorsMsgErrors.SEPARATOR}La categoria establecida no es valida.`);
         }
 
         categoryEntity = await repo.save(categoryEntity);

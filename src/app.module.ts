@@ -20,6 +20,7 @@ import { RefreshTokensModule } from './refresh-tokens/refresh-tokens.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { ScheduleModule } from '@nestjs/schedule';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -37,17 +38,22 @@ import { ScheduleModule } from '@nestjs/schedule';
         DB_PASSWORD: Joi.string().required(),
         DB_NAME: Joi.string().required(),
         // JWT VERIFICACION DE EMAIL
-        JWT_SECRET_VERIFICATION_EMAIL:Joi.string().required(),
+        JWT_SECRET_VERIFICATION_EMAIL: Joi.string().required(),
         // JWT AUTENTICACION DE USUARIO
-        JWT_SECRET_AUTH:Joi.string().required(),
+        JWT_SECRET_AUTH: Joi.string().required(),
         //TIEMPO DE EXPIRACION DADO
-        JWT_EXPIRES_AUTH:Joi.string().required(),
+        JWT_EXPIRES_AUTH: Joi.string().required(),
         // JWT REFRESH
-        JWT_SECRET_REFRESH:Joi.string().required(),
-        JWT_EXPIRES_REFRESH:Joi.string().required(),
-        RESEND_API_KEY:Joi.string().required(),
+        JWT_SECRET_REFRESH: Joi.string().required(),
+        JWT_EXPIRES_REFRESH: Joi.string().required(),
+        RESEND_API_KEY: Joi.string().required(),
+
+        CLOUDINARY_CLOUD_NAME: Joi.string().required(),
+        CLOUDINARY_API_KEY: Joi.string().required(),
+        CLOUDINARY_API_SECRET: Joi.string().required(),
+
         // DOMINIO + PUERTO
-        FE_HOST:Joi.string().required(),
+        FE_HOST: Joi.string().required(),
       }),
     }),
     // CONECTAR BASE DE DATOS
@@ -64,14 +70,14 @@ import { ScheduleModule } from '@nestjs/schedule';
         password: config.get<string>('DB_PASSWORD'), // PASSWORD DE LA DB
         database: config.get<string>('DB_NAME'), // NOMBRE DE LA BASE DE DATOS
         entities: [__dirname + '/**/*.entity{.ts,.js}'], // ENTIDADES QUE VA A LEER
-        synchronize: false // AUTO SINCRONIZA SCHEMA (EN TRUE NO USAR EN PRODUCCIÓN)
+        synchronize: false, // AUTO SINCRONIZA SCHEMA (EN TRUE NO USAR EN PRODUCCIÓN)
       }),
     }),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'dist', 'assets'),
-      serveRoot: '/assets' 
+      serveRoot: '/assets',
     }),
-    //CROS INICIALIZA EL PLANIFICADOR. 
+    //CROS INICIALIZA EL PLANIFICADOR.
     // REGISTRA CUALQUIER CRON JOB TIMEOUT O INTERVALO QUE EXISTA DENTRO DE LA APP.
     ScheduleModule.forRoot(),
     ServicesModule,

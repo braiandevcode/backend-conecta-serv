@@ -1,14 +1,11 @@
 import { Type } from 'class-transformer';
-import {
-  IsOptional,
-  IsString,
-  MaxLength,
-  ValidateNested,
-} from 'class-validator';
+import { IsArray, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { CreateBudgetDto } from 'src/budget/dto/create-budget.dto';
 import { CreateCategoryDto } from 'src/category/dto/create-category.dto';
 import { CreateDayDto } from 'src/day/dto/create-day.dto';
+import { CreateExperienceDto } from 'src/experiences/dto/create-experience.dto';
 import { CreateHourDto } from 'src/hour/dto/create-hour.dto';
+import { CreateProfileDto } from 'src/profile/dto/create-profile.dto';
 import { CreateServiceDto } from 'src/service/dto/create-service.dto';
 import { CreateWorkAreaDto } from 'src/work-area/dto/create-work-area.dto';
 
@@ -26,6 +23,15 @@ export class CreateTaskerDto {
   @ValidateNested()
   @Type(() => CreateServiceDto)
   serviceData: CreateServiceDto;
+
+  // @ValidateNested()
+  // @Type(() => CreateProfileDto)
+  imageProfileData: CreateProfileDto;
+
+  // @IsArray()
+  // @ValidateNested({ each: true })
+  // @Type(() => CreateExperienceDto)
+  imageExperienceData: CreateExperienceDto[];
 
   @ValidateNested()
   @Type(() => CreateWorkAreaDto)

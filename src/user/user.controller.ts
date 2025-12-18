@@ -3,22 +3,14 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
-  UseInterceptors,
-  UploadedFiles,
-  ValidationPipe,
   UseGuards,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { multerOptions } from 'src/shared/multer.options';
-import { TotalSizeValidationPipe } from 'src/shared/pipes/total-size-validation.pipe';
-import { ParseJsonPipe } from 'src/shared/pipes/parse-json.pipe';
 import { UserIdentifyEmailDto } from './dto/user-identify-email-dto';
 import { iMessageResponseStatus } from 'src/code/interface/iMessagesResponseStatus';
 import { AuthGuard } from '@nestjs/passport';
@@ -28,50 +20,15 @@ import { TDataPayloadTaskerSingle } from 'src/types/typeDataPayloadTaskerSingle'
 
 @Controller('api/v1')
 export class UserController {
+  private readonly logger:Logger = new Logger(UserController.name)
   constructor(private readonly userService: UserService) {}
 
   @Post('/users')
-  // INTERCEPTAR AMBOS CAMPOS
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: 'imageProfile', maxCount: 1 }, // EL CAMPO DEL PERFIL
-        { name: 'imageExperiences', maxCount: 10 }, // CAMPO DE EXPERIENCIAS HASTA 10
-      ],
-      multerOptions,
-    ),
-  )
-  create(
-    // RECUPERA UN OBJETO CON TODOS LOS CAMPOS SEPARADOS POR NOMBRE.
-    @UploadedFiles()
-    files: {
-      imageProfile?: Express.Multer.File[];
-      imageExperiences?: Express.Multer.File[];
-    },
-    @Body(
-      'data',
-      ParseJsonPipe,
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-      }),
-    )
-    createUserDto: CreateUserDto,
-  ) {
-    const profileFile: Express.Multer.File | null = files.imageProfile?.[0] || null;
-    const experienceFiles: Express.Multer.File[] = files.imageExperiences || [];
-
-    // EXTRAER Y APLICAR EL PIPE SOLO EN IMAGENES DE EXPERIENCIAS
-    const validatedExperienceFiles: Express.Multer.File[] = new TotalSizeValidationPipe().transform(
-      experienceFiles,
-    );
+  create(@Body() createUserDto: CreateUserDto) {
+    this.logger.debug('BODY DE CONTROLAOR DE USER: ', createUserDto)
+    
     //LLAMAR AL SERVICIO
-    return this.userService.create(
-      profileFile, //ARCHIVO PERFIL
-      validatedExperienceFiles, //ARCHIVOS EXPERIENCIAS VALIDADOS
-      createUserDto,
-    );
+    return this.userService.create(createUserDto,);
   }
 
   // USUARIOS ACTIVOS LOGEADOS

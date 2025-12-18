@@ -158,7 +158,7 @@ export class CodeService {
 
       // SI NO SE ACTUALIZO ES EL PRIMER REGISTRO ENTONCES INSERTAR
       if (updateResult.affected === 0) {
-        // GUARDAR NUEVO REGISTRO EN LA DB (SE CUMPLE TU SEGUNDO REQUERIMIENTO PARCIAL)
+        // GUARDAR NUEVO REGISTRO EN LA DB
         const newCodeRecordCode = this.codeRepository.create({
           toEmail: emailCode,
           ...newValues,

@@ -22,7 +22,7 @@ import { ExperiencesService } from 'src/experiences/experiences.service';
 import { Profile } from 'src/profile/entities/profile.entity';
 import { Experience } from 'src/experiences/entities/experience.entity';
 import { instanceToPlain } from 'class-transformer';
-import { TaskerResponse } from './dto/response-tasker.dto';
+// import { TaskerResponse } from './dto/response-tasker.dto';
 import { ECategory } from 'src/common/enums/enumCategory';
 import { TTaskerImage } from 'src/types/typeTaskerImage';
 
@@ -42,14 +42,18 @@ export class TaskersService {
   ) {}
 
   // CREAR UN TASKER
-  async create(
-    fileProfile: Express.Multer.File | null,
-    filesExp: Express.Multer.File[],
-    createTaskerDto: CreateTaskerDto,
-    mannager: EntityManager, //ADMINISTRADOR DE TRANSACCION DE typeorm
-  ): Promise<Tasker> {
-    const { categoryData, dayData, hourData, workAreaData, serviceData, description, budgetData } =
-      createTaskerDto;
+  async create(createTaskerDto: CreateTaskerDto, mannager: EntityManager): Promise<Tasker> {
+    const {
+      categoryData,
+      dayData,
+      hourData,
+      workAreaData,
+      serviceData,
+      description,
+      budgetData,
+      imageProfileData,
+      imageExperienceData,
+    } = createTaskerDto;
     try {
       // OBTENER EL ROPISITORIO TRANSACCIONAL ==> NECESARIO PARA EL CREATE
       const taskerRepository: Repository<Tasker> = mannager.getRepository(Tasker);
@@ -89,6 +93,10 @@ export class TaskersService {
       this.logger.debug(hourEntity);
       // -------------SECCION DE DATOS PRESUPUESTO-------------------//
       let budgetEntity: Budget | null = null;
+
+      let profileEntity: Profile | null = null;
+      let experienceEntity: Experience[] = [];
+
       // PREGUNTO SI VIENEN DATOS EN DTO ANTES DE PROCESAR A AGREGAR EN PRESUPUESTO
       if (budgetData) {
         budgetEntity = await this.budgetService.create(
@@ -115,29 +123,34 @@ export class TaskersService {
 
       this.logger.debug(newDataTasker);
 
-      // ALMACENAR DATOS
+      // ALMACENAR DATOS DE TASKER ANTES DE PASAR EL ID AL LAS ENTIDADES DE IMAGENES
       const savedDataTasker: Tasker = await taskerRepository.save(newDataTasker);
 
-      // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGEN DEL PERFIL
-      const imageProfile: Profile | null =
-        (await this.imageProfileService.create(fileProfile, savedDataTasker.idTasker, mannager)) ??
-        null;
 
-        this.logger.debug(imageProfile);
 
-      // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGENES DEL EXPERIENCIAS
-      const imagesExperiences: Experience[] =(await this.imageExpService.create(filesExp, savedDataTasker.idTasker, mannager)) ?? [];
+      // SI VIENEN IMAGEN DE PERFIL
+       if (imageProfileData) {
+        // LLAMO A SERVICIO DE CREACION Y ALMACENAMIENTO DE IMAGEN DEL PERFIL
+        profileEntity = (await this.imageProfileService.create(savedDataTasker.idTasker, imageProfileData, mannager)) ?? null;
+      }
 
-      this.logger.debug(imagesExperiences);
+      this.logger.debug('ENTIDAD DE PERFIL DE TASKER: ', profileEntity);
 
-      const taskerPlain = instanceToPlain(savedDataTasker) as Tasker;
+      // SI VIENEN IMAGENES DE EXPERIENCIAS DEL TASKER
+      if (imageExperienceData.length > 0) {
+        experienceEntity =
+          (await this.imageExpService.create(
+            savedDataTasker.idTasker,
+            imageExperienceData,
+            mannager,
+          )) ?? [];
+      }
 
-      this.logger.debug(taskerPlain);
-      return {
-        ...taskerPlain,
-        profileImage: this.imageProfileService.mapProfileImage(imageProfile),
-        experiencesImages: this.imageExpService.mapExperienceImages(imagesExperiences),
-      } as TaskerResponse;
+      this.logger.debug('ENTIDADES DE PERFIL DE TASKER: ', experienceEntity);
+
+      this.logger.debug('SALVAR DATOS DE TASKER', savedDataTasker);
+
+      return savedDataTasker;
     } catch (error) {
       const err = error as HttpException;
       this.logger.error(err.message, err.stack);

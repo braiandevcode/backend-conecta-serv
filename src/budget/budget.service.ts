@@ -22,22 +22,25 @@ export class BudgetService {
     const { amountBudge, budgeSelected, reinsertSelected } = createBudgetDto;
     try {
       // AQUI SE DEFINE CUAL Repository/Manager USAR
-      const repo: Repository<Budget> = manager ? manager.getRepository(Budget) : this.budgetRepository;
-      
+      const repo: Repository<Budget> = manager
+        ? manager.getRepository(Budget)
+        : this.budgetRepository;
+
       let budgeTasker: Budget | null = null;
 
-      // SI CATEGORIA ES REPARACION Y MANTENIMIENTO
-      if (category === ECategory.REPAIR) {
-        // SI VIENEN DATOS DE PRESUPUESTO
-        // CREAR
-        budgeTasker = repo.create({
-          amount: amountBudge,
-          reinsertSelected,
-          budgeSelected,
-        });
-      }else{
-        ErrorManager.createSignatureError(`BAD_REQUEST${ESeparatorsMsgErrors.SEPARATOR} No se permiten datos para esta categoria`)
+      if (category !== ECategory.REPAIR) {
+        throw ErrorManager.createSignatureError(
+          `BAD_REQUEST${ESeparatorsMsgErrors.SEPARATOR} No se permiten datos para esta categoria`,
+        );
       }
+      // SI CATEGORIA ES REPARACION Y MANTENIMIENTO
+      // SI VIENEN DATOS DE PRESUPUESTO
+      // CREAR
+      budgeTasker = repo.create({
+        amount: amountBudge,
+        reinsertSelected,
+        budgeSelected,
+      });
 
       return budgeTasker;
     } catch (error) {
